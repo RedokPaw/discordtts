@@ -29,8 +29,8 @@ public class BotProperties {
     //TODO: Обязательно отрефакторить эту кашу
     private void loadTokenFromProperties() throws FileNotFoundException {
         log.info("Loading configuration");
-        String envToken = System.getenv("token");
-        String envPort = System.getenv("port");
+        String envToken = System.getenv("TOKEN");
+        String envPort = System.getenv("PORT");
         token = envToken;
         if (envPort != null) {
             port = Integer.parseInt(envPort);
