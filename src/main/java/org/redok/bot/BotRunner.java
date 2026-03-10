@@ -1,10 +1,6 @@
 package org.redok.bot;
 
 import club.minnced.discord.jdave.interop.JDaveSessionFactory;
-import com.sedmelluq.discord.lavaplayer.jdaudp.NativeAudioSendFactory;
-import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
-import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
-import com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers;
 import com.sun.net.httpserver.HttpServer;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
