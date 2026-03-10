@@ -19,9 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl \
 
 WORKDIR /app
 
-COPY --from=builder /app/target/*.jar app.jar
+COPY --from=builder /app/target/*-jar-with-dependencies.jar app.jar
 
-# Документационный EXPOSE — реальный порт задаётся через PORT в docker-compose
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
