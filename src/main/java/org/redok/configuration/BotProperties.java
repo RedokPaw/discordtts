@@ -26,28 +26,37 @@ public class BotProperties {
         return port;
     }
 
+    //TODO: Обязательно отрефакторить эту кашу
     private void loadTokenFromProperties() throws FileNotFoundException {
         log.info("Loading configuration");
-        String systemEnv = System.getenv("bot_token");
-        if (systemEnv != null) {
-            token = systemEnv;
-            return;
+        String envToken = System.getenv("token");
+        String envPort = System.getenv("port");
+        token = envToken;
+        if (envPort != null) {
+            port = Integer.parseInt(envPort);
+        } else {
+            log.info("Using standard healthcheck port: 8081");
         }
-        log.warn("Bot token environment variable not set, trying to find bot.properties");
-        Properties prop = new Properties();
-        try (InputStream input = BotProperties.class.getClassLoader().getResourceAsStream("bot.properties")) {
-            prop.load(input);
-            token = prop.getProperty("token");
-            String portProperty = prop.getProperty("port");
-            if (portProperty == null) {
-                log.info("Standard healthcheck port: 8081");
-            } else {
-                port = Integer.parseInt(portProperty);
+        if (envToken != null) {
+            log.info("Using environment variable token");
+            return;
+        } else {
+            log.warn("Bot token environment variable not set, trying to find bot.properties");
+            Properties prop = new Properties();
+            try (InputStream input = BotProperties.class.getClassLoader().getResourceAsStream("bot.properties")) {
+                log.info("Properties file found");
+                prop.load(input);
+                token = prop.getProperty("token");
+                String portProperty = prop.getProperty("port");
+                if (portProperty == null) {
+                    log.info("Using standard healthcheck port: 8081");
+                } else {
+                    port = Integer.parseInt(portProperty);
+                }
+            } catch (Exception e) {
+                log.error("Error while loading bot.properties!", e);
+                throw new FileNotFoundException(e.getMessage());
             }
-            log.info("Properties file found");
-        } catch (Exception e) {
-            log.error("Error while loading bot.properties!", e);
-            throw new FileNotFoundException(e.getMessage());
         }
         log.info("Configuration loaded");
     }
