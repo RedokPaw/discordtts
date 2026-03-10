@@ -36,16 +36,6 @@
         </dependency>
         <dependency>
             <groupId>club.minnced</groupId>
-            <artifactId>udpqueue-native-win-x86</artifactId>
-            <version>0.2.12</version>
-        </dependency>
-        <dependency>
-            <groupId>club.minnced</groupId>
-            <artifactId>udpqueue-native-linux-x86</artifactId>
-            <version>0.2.12</version>
-        </dependency>
-        <dependency>
-            <groupId>club.minnced</groupId>
             <artifactId>jdave-api</artifactId>
             <version>0.1.7</version>
         </dependency>
@@ -61,10 +51,21 @@
             <artifactId>jdave-native-win-x86-64</artifactId>
             <version>0.1.7</version>
         </dependency>
-        <dependency>
-            <groupId>dev.arbjerg</groupId>
-            <artifactId>lavaplayer</artifactId>
-            <version>2.2.6</version>
-        </dependency>
     </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>org.redok.Main</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
