@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: java-app
+    container_name: discordtts
     restart: unless-stopped
     ports:
       - "${PORT:-8080}:${PORT:-8080}"
