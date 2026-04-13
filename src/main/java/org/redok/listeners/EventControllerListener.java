@@ -15,6 +15,7 @@ import org.redok.commands.BotCommandHandler;
 import org.redok.commands.BotCommandHandlerFactory;
 import org.redok.tts.TTSMessageHandler;
 import org.redok.tts.TTSMessageHandlerFactory;
+import org.redok.utils.UrlReplacer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +52,8 @@ public class EventControllerListener extends ListenerAdapter {
             return;
         }
 
-        messageHandler.handleMessageAndSpeak(event);
+        String text = UrlReplacer.replaceUrlsWithDomains(event.getMessage().getContentDisplay());
+        messageHandler.handleMessageAndSpeak(text, event.getGuild().getId());
     }
 
     @Override

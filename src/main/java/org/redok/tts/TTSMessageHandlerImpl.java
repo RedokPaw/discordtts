@@ -1,8 +1,6 @@
 package org.redok.tts;
 
 import net.dv8tion.jda.api.audio.AudioSendHandler;
-import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
-import org.redok.utils.UrlReplacer;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -34,11 +32,10 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
     );
 
     @Override
-    public void handleMessageAndSpeak(MessageReceivedEvent event) {
-        String text = UrlReplacer.replaceUrlsWithDomains(event.getMessage().getContentDisplay());
+    public void handleMessageAndSpeak(String text, String guildId) {
         InputStream mp3Stream = getAudioFromGoogleTTS(text);
         InputStream pcmStream = convertAudioToPCM(mp3Stream);
-        handlerPerGuild.get(event.getGuild().getId()).queueTtsStream(pcmStream);
+        handlerPerGuild.get(guildId).queueTtsStream(pcmStream);
     }
 
     @Override
