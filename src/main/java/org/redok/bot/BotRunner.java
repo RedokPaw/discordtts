@@ -14,7 +14,6 @@ import org.redok.listeners.EventControllerListenerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
@@ -27,12 +26,7 @@ public class BotRunner {
     private JDA jda;
 
     public BotRunner() {
-        try {
-            botProperties = BotProperties.getDefaultProperties();
-        } catch (FileNotFoundException e) {
-            log.error("Cant create instance of BotRunner", e);
-            throw new RuntimeException(e);
-        }
+        botProperties = BotProperties.getDefaultProperties();
     }
 
     public void run() throws IOException {
