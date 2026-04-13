@@ -5,19 +5,20 @@ import net.dv8tion.jda.api.audio.AudioSendHandler;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class AudioSendHandlerImpl implements AudioSendHandler {
     private static final int FRAME_SIZE = 3840;
-    private final Queue<InputStream> ttsQueue = new ConcurrentLinkedQueue<>();
+    private final BlockingQueue<InputStream> ttsQueue = new LinkedBlockingQueue<>();
     private InputStream pcmStream;
     private final byte[] buffer = new byte[FRAME_SIZE];
 
     private ByteBuffer nextChunk = null;
+    private ByteBuffer tempChunk = ByteBuffer.allocate(FRAME_SIZE);
 
-    public void queueTtsStream(InputStream inputStream) {
-        ttsQueue.add(inputStream);
+    public boolean queueTtsStream(InputStream inputStream) {
+        return ttsQueue.offer(inputStream);
     }
 
     @Override
@@ -39,10 +40,10 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
                 pcmStream = null;
                 return false;
             }
-            ByteBuffer chunk = ByteBuffer.allocate(FRAME_SIZE);
-            chunk.put(buffer, 0, FRAME_SIZE);
-            chunk.flip();
-            nextChunk = chunk;
+            tempChunk.clear();
+            tempChunk.put(buffer, 0, bytesRead);
+            tempChunk.flip();
+            nextChunk = tempChunk;
             return true;
         } catch (IOException e) {
             e.printStackTrace();
