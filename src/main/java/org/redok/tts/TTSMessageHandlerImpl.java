@@ -32,10 +32,10 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
     );
 
     @Override
-    public void handleMessageAndSpeak(String text, String guildId) {
+    public boolean handleMessageAndSpeak(String text, String guildId) {
         InputStream mp3Stream = getAudioFromGoogleTTS(text);
         InputStream pcmStream = convertAudioToPCM(mp3Stream);
-        handlerPerGuild.get(guildId).queueTtsStream(pcmStream);
+        return handlerPerGuild.get(guildId).queueTtsStream(pcmStream);
     }
 
     @Override

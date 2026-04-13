@@ -14,8 +14,8 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
     private InputStream pcmStream;
     private final byte[] buffer = new byte[FRAME_SIZE];
 
-    private ByteBuffer nextChunk = null;
-    private ByteBuffer tempChunk = ByteBuffer.allocate(FRAME_SIZE);
+    private boolean hasChunk = false;
+    private ByteBuffer chunk = ByteBuffer.allocate(FRAME_SIZE);
 
     public boolean queueTtsStream(InputStream inputStream) {
         return ttsQueue.offer(inputStream);
@@ -23,7 +23,7 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
 
     @Override
     public boolean canProvide() {
-        if (nextChunk != null) {
+        if (hasChunk) {
             return true;
         }
         if (pcmStream == null) {
@@ -37,13 +37,13 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
             int bytesRead = pcmStream.readNBytes(buffer, 0, FRAME_SIZE);
             if (bytesRead == 0) {
                 pcmStream.close();
-                pcmStream = null;
+                pcmStream = ttsQueue.poll();
                 return false;
             }
-            tempChunk.clear();
-            tempChunk.put(buffer, 0, bytesRead);
-            tempChunk.flip();
-            nextChunk = tempChunk;
+            chunk.clear();
+            chunk.put(buffer, 0, bytesRead);
+            chunk.flip();
+            hasChunk = true;
             return true;
         } catch (IOException e) {
             e.printStackTrace();
@@ -53,8 +53,7 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
 
     @Override
     public ByteBuffer provide20MsAudio() {
-        ByteBuffer chunk = nextChunk;
-        nextChunk = null;
+        hasChunk = false;
         return chunk;
     }
 
