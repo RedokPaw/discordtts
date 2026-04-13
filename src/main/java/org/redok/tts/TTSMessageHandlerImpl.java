@@ -91,8 +91,6 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
                 audioStream.transferTo(ffmpegIn);
             } catch (IOException e) {
                 log.warning("Error writing to ffmpeg stdin");
-            } finally {
-                process.destroy();
             }
         });
         return new BufferedInputStream(process.getInputStream());
