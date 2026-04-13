@@ -10,7 +10,6 @@ services:
     environment:
       - TOKEN=${TOKEN}
       - PORT=${PORT:-8080}
-      - JAVA_OPTS=-Xms256m -Xmx512m
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8080}/health"]
       interval: 30s
