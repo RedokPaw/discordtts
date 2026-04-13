@@ -21,6 +21,10 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
         return ttsQueue.offer(inputStream);
     }
 
+    public boolean isQueueFull() {
+        return ttsQueue.size() >= 10;
+    }
+
     @Override
     public boolean canProvide() {
         if (hasChunk) {

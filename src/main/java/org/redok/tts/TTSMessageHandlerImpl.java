@@ -36,9 +36,13 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
 
     @Override
     public boolean handleMessageAndSpeak(String text, String guildId) {
+        AudioSendHandlerImpl handler = handlerPerGuild.get(guildId);
+        if (handler == null || handler.isQueueFull()) {
+            return false;
+        }
         InputStream mp3Stream = getAudioFromGoogleTTS(text);
         InputStream pcmStream = convertAudioToPCM(mp3Stream);
-        return handlerPerGuild.get(guildId).queueTtsStream(pcmStream);
+        return handler.queueTtsStream(pcmStream);
     }
 
     @Override
@@ -87,6 +91,8 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
                 audioStream.transferTo(ffmpegIn);
             } catch (IOException e) {
                 log.warning("Error writing to ffmpeg stdin");
+            } finally {
+                process.destroy();
             }
         });
         return new BufferedInputStream(process.getInputStream());
