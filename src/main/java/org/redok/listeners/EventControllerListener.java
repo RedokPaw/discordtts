@@ -53,7 +53,10 @@ public class EventControllerListener extends ListenerAdapter {
         }
 
         String text = UrlReplacer.replaceUrlsWithDomains(event.getMessage().getContentDisplay());
-        messageHandler.handleMessageAndSpeak(text, event.getGuild().getId());
+        boolean queued = messageHandler.handleMessageAndSpeak(text, event.getGuild().getId());
+        if (!queued) {
+            event.getMessage().reply("Очередь сообщений переполнена, попробуй позже").queue();
+        }
     }
 
     @Override
