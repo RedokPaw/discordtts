@@ -14,12 +14,15 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 //TODO: Отделить гуглттс, сделать аудиопровайдера кастомайзбл, конвертирование тоже увести в другой класс
 public class TTSMessageHandlerImpl implements TTSMessageHandler {
 
+    private final Logger log = Logger.getLogger(TTSMessageHandlerImpl.class.getName());
     private final String language = "ru";
     private final Map<String, AudioSendHandlerImpl> handlerPerGuild = new HashMap<>();
+    private final HttpClient httpClient = HttpClient.newBuilder().build();
     private final ProcessBuilder pb = new ProcessBuilder(
             "ffmpeg",
             "-loglevel", "error",
@@ -59,7 +62,6 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
         );
 
         HttpResponse<InputStream> response;
-        HttpClient httpClient = HttpClient.newBuilder().build();
         HttpRequest request = HttpRequest.newBuilder()
                 .GET()
                 .uri(URI.create(url))
@@ -83,7 +85,8 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
         Thread.ofVirtual().start(() -> {
             try (OutputStream ffmpegIn = process.getOutputStream()) {
                 audioStream.transferTo(ffmpegIn);
-            } catch (IOException ignored) {
+            } catch (IOException e) {
+                log.warning("Error writing to ffmpeg stdin");
             }
         });
         return new BufferedInputStream(process.getInputStream());

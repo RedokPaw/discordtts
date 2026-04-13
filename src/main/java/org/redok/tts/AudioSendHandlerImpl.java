@@ -10,7 +10,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class AudioSendHandlerImpl implements AudioSendHandler {
     private static final int FRAME_SIZE = 3840;
-    private final BlockingQueue<InputStream> ttsQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<InputStream> ttsQueue = new LinkedBlockingQueue<>(10);
     private InputStream pcmStream;
     private final byte[] buffer = new byte[FRAME_SIZE];
 
@@ -42,6 +42,9 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
             }
             chunk.clear();
             chunk.put(buffer, 0, bytesRead);
+            if (bytesRead < FRAME_SIZE) {
+                chunk.put(new byte[FRAME_SIZE - bytesRead]); // тишина
+            }
             chunk.flip();
             hasChunk = true;
             return true;
