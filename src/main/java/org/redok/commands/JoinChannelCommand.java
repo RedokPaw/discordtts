@@ -5,6 +5,7 @@ import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 import org.redok.bot.BotController;
 import org.redok.bot.BotFactory;
@@ -38,7 +39,9 @@ public class JoinChannelCommand implements SlashCommand {
             botController.joinVoiceChannel(event.getGuild(), voiceState);
             replyCallbackAction = event.reply("Никогда не доверяй фурри");
         }
-        Thread.ofVirtual().start(
-                () -> replyCallbackAction.delay(Duration.ofSeconds(10)).complete().deleteOriginal().queue());
+        replyCallbackAction
+                .delay(Duration.ofSeconds(10))
+                .flatMap(InteractionHook::deleteOriginal)
+                .queue();
     }
 }

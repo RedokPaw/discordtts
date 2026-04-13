@@ -1,6 +1,7 @@
 package org.redok.commands;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.InteractionHook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,9 +28,10 @@ public class BotCommandHandler {
         if (slashCommand != null) {
             slashCommand.onSlashCommandInteraction(event);
         } else {
-            Thread.ofVirtual().start(() ->
-                    event.reply("This slash command does not exist")
-                            .delay(Duration.ofSeconds(10)).complete().deleteOriginal().queue());
+            event.reply("This slash command does not exist")
+                    .delay(Duration.ofSeconds(10))
+                    .flatMap(InteractionHook::deleteOriginal)
+                    .queue();
         }
     }
 

@@ -2,6 +2,7 @@ package org.redok.commands;
 
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
@@ -37,6 +38,9 @@ public class LeaveChannelCommand implements SlashCommand {
         } else {
             replyCallbackAction = event.reply("Я не в вашем голосовом канале");
         }
-        Thread.ofVirtual().start(() -> replyCallbackAction.delay(Duration.ofSeconds(3)).complete().deleteOriginal().queue());
+        replyCallbackAction
+                .delay(Duration.ofSeconds(3))
+                .flatMap(InteractionHook::deleteOriginal)
+                .queue();
     }
 }
