@@ -3,6 +3,7 @@ package org.redok.listeners;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -56,9 +57,9 @@ public class EventControllerListener extends ListenerAdapter {
         String text = UrlReplacer.replaceUrlsWithDomains(event.getMessage().getContentDisplay());
         boolean queued = messageHandler.handleMessageAndSpeak(text, event.getGuild().getId());
         if (!queued) {
-            event.getMessage().reply("Очередь сообщений переполнена, попробуй позже")
+            event.getMessage().reply("Очередь сообщений переполнена, не так быстро!")
                     .delay(Duration.ofSeconds(10))
-                    .flatMap(msg -> msg.delete())
+                    .flatMap(Message::delete)
                     .queue();
         }
     }
