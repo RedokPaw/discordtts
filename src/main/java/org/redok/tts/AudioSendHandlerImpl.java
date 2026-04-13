@@ -1,6 +1,8 @@
 package org.redok.tts;
 
 import net.dv8tion.jda.api.audio.AudioSendHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -9,20 +11,22 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class AudioSendHandlerImpl implements AudioSendHandler {
+    private static final int QUEUE_CAPACITY = 10;
     private static final int FRAME_SIZE = 3840;
-    private final BlockingQueue<InputStream> ttsQueue = new LinkedBlockingQueue<>(10);
+    private final BlockingQueue<InputStream> ttsQueue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
     private InputStream pcmStream;
     private final byte[] buffer = new byte[FRAME_SIZE];
-
     private boolean hasChunk = false;
     private ByteBuffer chunk = ByteBuffer.allocate(FRAME_SIZE);
+
+    private final Logger logger = LoggerFactory.getLogger(AudioSendHandlerImpl.class);
 
     public boolean queueTtsStream(InputStream inputStream) {
         return ttsQueue.offer(inputStream);
     }
 
     public boolean isQueueFull() {
-        return ttsQueue.size() >= 10;
+        return ttsQueue.size() >= QUEUE_CAPACITY;
     }
 
     @Override
@@ -53,7 +57,7 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
             hasChunk = true;
             return true;
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
             return false;
         }
     }
