@@ -19,6 +19,7 @@ import org.redok.utils.UrlReplacer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
@@ -55,7 +56,10 @@ public class EventControllerListener extends ListenerAdapter {
         String text = UrlReplacer.replaceUrlsWithDomains(event.getMessage().getContentDisplay());
         boolean queued = messageHandler.handleMessageAndSpeak(text, event.getGuild().getId());
         if (!queued) {
-            event.getMessage().reply("Очередь сообщений переполнена, попробуй позже").queue();
+            event.getMessage().reply("Очередь сообщений переполнена, попробуй позже")
+                    .delay(Duration.ofSeconds(10))
+                    .flatMap(msg -> msg.delete())
+                    .queue();
         }
     }
 
