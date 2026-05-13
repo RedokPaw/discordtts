@@ -14,11 +14,14 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
 import java.util.logging.Logger;
 
 //TODO: Отделить гуглттс, сделать аудиопровайдера кастомайзбл, конвертирование тоже увести в другой класс
 public class TTSMessageHandlerImpl implements TTSMessageHandler {
 
+    private static final int MAX_PROCESS_THREADS = 3;
+    private final Semaphore semaphore = new Semaphore(MAX_PROCESS_THREADS);
     private final Logger log = Logger.getLogger(TTSMessageHandlerImpl.class.getName());
     private final String language = "ru";
     private final Map<String, AudioSendHandlerImpl> handlerPerGuild = new HashMap<>();
@@ -85,7 +88,11 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
+        try {
+            semaphore.acquire();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         Thread.ofVirtual().start(() -> {
             try (OutputStream ffmpegIn = process.getOutputStream()) {
                 audioStream.transferTo(ffmpegIn);
@@ -93,7 +100,14 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
                 log.warning("Error writing to ffmpeg stdin");
             }
         });
-        return new BufferedInputStream(process.getInputStream());
+        return new BufferedInputStream(process.getInputStream()) {
+            @Override
+            public void close() throws IOException {
+                super.close();
+                process.destroy();
+                semaphore.release();
+            }
+        };
     }
 }
 

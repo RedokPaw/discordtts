@@ -10,7 +10,10 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+
+//TODO: все таки хранить не InputStream, а массив байтов
 public class AudioSendHandlerImpl implements AudioSendHandler {
+
     private static final int QUEUE_CAPACITY = 10;
     private static final int FRAME_SIZE = 3840;
     private final BlockingQueue<InputStream> ttsQueue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
