@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -16,16 +17,26 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
 
     private static final int QUEUE_CAPACITY = 10;
     private static final int FRAME_SIZE = 3840;
-    private final BlockingQueue<InputStream> ttsQueue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
-    private InputStream pcmStream;
-    private final byte[] buffer = new byte[FRAME_SIZE];
-    private boolean hasChunk = false;
+    private final BlockingQueue<ByteBuffer> ttsQueue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
+    private ByteBuffer ttsBuffer;
     private ByteBuffer chunk = ByteBuffer.allocate(FRAME_SIZE);
+    private boolean hasChunk = false;
 
-    private final Logger logger = LoggerFactory.getLogger(AudioSendHandlerImpl.class);
+    private final Logger log = LoggerFactory.getLogger(AudioSendHandlerImpl.class);
 
     public boolean queueTtsStream(InputStream inputStream) {
-        return ttsQueue.offer(inputStream);
+        byte[] payload;
+        try (inputStream) {
+            payload = inputStream.readAllBytes();
+        } catch (IOException e) {
+            log.error("something bad happened while reading tts audio: {}", e.getMessage());
+            throw new RuntimeException(e);
+        }
+        int remainder = payload.length % FRAME_SIZE;
+        if (remainder != 0) {
+            payload = Arrays.copyOf(payload, payload.length + (FRAME_SIZE - remainder));
+        }
+        return ttsQueue.offer(ByteBuffer.wrap(payload));
     }
 
     public boolean isQueueFull() {
@@ -37,32 +48,27 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
         if (hasChunk) {
             return true;
         }
-        if (pcmStream == null) {
-            pcmStream = ttsQueue.poll();
+        if (ttsBuffer == null) {
+            ttsBuffer = ttsQueue.poll();
+            if (ttsBuffer == null) {
+                return false;
+            }
         }
-        if (pcmStream == null) {
+
+        int bytesLeft = Math.min(ttsBuffer.remaining(), FRAME_SIZE);
+        if (bytesLeft == 0) {
+            ttsBuffer = null;
             return false;
         }
 
-        try {
-            int bytesRead = pcmStream.readNBytes(buffer, 0, FRAME_SIZE);
-            if (bytesRead == 0) {
-                pcmStream.close();
-                pcmStream = ttsQueue.poll();
-                return false;
-            }
-            chunk.clear();
-            chunk.put(buffer, 0, bytesRead);
-            if (bytesRead < FRAME_SIZE) {
-                chunk.put(new byte[FRAME_SIZE - bytesRead]); // тишина
-            }
-            chunk.flip();
-            hasChunk = true;
-            return true;
-        } catch (IOException e) {
-            logger.error(e.getMessage(), e);
-            return false;
-        }
+        chunk.clear();
+        ttsBuffer.limit(ttsBuffer.position() + bytesLeft);
+        chunk.put(ttsBuffer);
+        ttsBuffer.limit(ttsBuffer.capacity());
+
+        chunk.flip();
+        hasChunk = true;
+        return true;
     }
 
     @Override

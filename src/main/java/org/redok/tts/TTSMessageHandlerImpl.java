@@ -20,7 +20,7 @@ import java.util.logging.Logger;
 //TODO: Отделить гуглттс, сделать аудиопровайдера кастомайзбл, конвертирование тоже увести в другой класс
 public class TTSMessageHandlerImpl implements TTSMessageHandler {
 
-    private static final int MAX_PROCESS_THREADS = 3;
+    private static final int MAX_PROCESS_THREADS = 5;
     private final Semaphore semaphore = new Semaphore(MAX_PROCESS_THREADS);
     private final Logger log = Logger.getLogger(TTSMessageHandlerImpl.class.getName());
     private final String language = "ru";
@@ -43,9 +43,13 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
         if (handler == null || handler.isQueueFull()) {
             return false;
         }
-        InputStream mp3Stream = getAudioFromGoogleTTS(text);
-        InputStream pcmStream = convertAudioToPCM(mp3Stream);
-        return handler.queueTtsStream(pcmStream);
+        Thread.ofVirtual().start(() -> {
+            InputStream mp3Stream = getAudioFromGoogleTTS(text);
+            InputStream pcmStream = convertAudioToPCM(mp3Stream);
+            handler.queueTtsStream(pcmStream);
+        });
+
+        return true;
     }
 
     @Override
@@ -84,13 +88,15 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
     public InputStream convertAudioToPCM(InputStream audioStream) {
         Process process;
         try {
-            process = pb.start();
-        } catch (IOException e) {
+            semaphore.acquire();
+            log.info(String.valueOf(semaphore.availablePermits()));
+        } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
         try {
-            semaphore.acquire();
-        } catch (InterruptedException e) {
+            process = pb.start();
+        } catch (IOException e) {
+            semaphore.release();
             throw new RuntimeException(e);
         }
         Thread.ofVirtual().start(() -> {
