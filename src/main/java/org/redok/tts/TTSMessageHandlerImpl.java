@@ -90,7 +90,6 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
         Process process;
         try {
             semaphore.acquire();
-            log.info(String.valueOf(semaphore.availablePermits()));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
