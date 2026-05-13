@@ -12,7 +12,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 
-//TODO: все таки хранить не InputStream, а массив байтов
 public class AudioSendHandlerImpl implements AudioSendHandler {
 
     private static final int QUEUE_CAPACITY = 10;

@@ -18,6 +18,7 @@ import java.util.concurrent.Semaphore;
 import java.util.logging.Logger;
 
 //TODO: Отделить гуглттс, сделать аудиопровайдера кастомайзбл, конвертирование тоже увести в другой класс
+//и еще вынести кол-во threads в env
 public class TTSMessageHandlerImpl implements TTSMessageHandler {
 
     private static final int MAX_PROCESS_THREADS = 5;
