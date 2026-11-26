@@ -1,0 +1,10 @@
+# Образу нужны только pom.xml и src/ (см. Dockerfile), остальное — лишний контекст сборки.
+# Секреты не должны попасть в образ ни при каких условиях.
+.env
+bot.properties
+**/bot.properties
+.git/
+.idea/
+.claude/
+target/
+logs/

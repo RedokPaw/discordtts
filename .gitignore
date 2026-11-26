@@ -37,3 +37,9 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Secrets and local runtime files ###
+.env
+bot.properties
+logs/
+.claude/worktrees/
