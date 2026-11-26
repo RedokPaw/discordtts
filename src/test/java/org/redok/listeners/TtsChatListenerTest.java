@@ -15,7 +15,9 @@ import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.managers.AudioManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.redok.preferences.VoicePreferences;
 import org.redok.testutil.FakeTts;
+import org.redok.testutil.MemoryVoiceStore;
 import org.redok.testutil.Stubs;
 import org.redok.tts.TtsSynthesizer;
 import org.redok.voice.VoiceService;
@@ -36,6 +38,7 @@ class TtsChatListenerTest {
     private final AudioChannelUnion voiceChannel = stubs.stub(AudioChannelUnion.class,
             "getId", "42", "getName", "voice", "getJDA", jda, "getMembers", List.of(bot));
     private final Guild guild = stubs.stub(Guild.class, "getId", "g", "getAudioManager", stubs.stub(AudioManager.class));
+    private final VoicePreferences preferences = new VoicePreferences(new MemoryVoiceStore(), engine.registry());
     private TtsChatListener listener;
 
     @BeforeEach
@@ -43,7 +46,7 @@ class TtsChatListenerTest {
         // очередь на одно место, синтез прямо в вызывающем потоке
         VoiceService voice = new VoiceService(new TtsSynthesizer(engine.registry(), encoded -> encoded, Runnable::run, 1), 1);
         voice.join(guild, voiceChannel);
-        listener = new TtsChatListener(voice, engine.registry());
+        listener = new TtsChatListener(voice, preferences);
     }
 
     @Test
@@ -51,6 +54,22 @@ class TtsChatListenerTest {
         receive(memberIn(voiceChannel), "42", "привет");
 
         assertEquals(List.of("привет"), engine.texts());
+    }
+
+    @Test
+    void readsWithTheAuthorsVoice() {
+        preferences.set("7", FakeTts.OTHER_VOICE);
+
+        receive(memberIn(voiceChannel), "42", "привет");
+
+        assertEquals(List.of(FakeTts.OTHER_VOICE), engine.voicesUsed());
+    }
+
+    @Test
+    void readsWithTheDefaultVoiceWhenTheAuthorDidNotChoose() {
+        receive(memberIn(voiceChannel), "42", "привет");
+
+        assertEquals(List.of(FakeTts.VOICE), engine.voicesUsed());
     }
 
     @Test
@@ -118,7 +137,8 @@ class TtsChatListenerTest {
     }
 
     private Member memberIn(AudioChannelUnion channel) {
-        return stubs.stub(Member.class, "getVoiceState", stubs.stub(GuildVoiceState.class, "getChannel", channel));
+        return stubs.stub(Member.class, "getId", "7",
+                "getVoiceState", stubs.stub(GuildVoiceState.class, "getChannel", channel));
     }
 
     private void receive(Member author, String channelId, String text) {

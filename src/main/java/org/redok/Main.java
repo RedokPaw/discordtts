@@ -14,7 +14,9 @@ import org.redok.configuration.BotConfig;
 import org.redok.listeners.CommandListener;
 import org.redok.listeners.TtsChatListener;
 import org.redok.listeners.VoiceStateListener;
+import org.redok.preferences.VoicePreferences;
 import org.redok.storage.Database;
+import org.redok.storage.SqliteUserVoiceStore;
 import org.redok.tts.GoogleTranslateTts;
 import org.redok.tts.TtsSynthesizer;
 import org.redok.tts.VoiceRegistry;
@@ -44,6 +46,7 @@ public class Main {
         ExecutorService ttsPool = Executors.newFixedThreadPool(
                 config.ttsThreads(), Thread.ofPlatform().name("tts-", 1).factory());
         VoiceRegistry voices = new VoiceRegistry(List.of(googleTts(config)), config.ttsDefaultVoice());
+        VoicePreferences preferences = new VoicePreferences(new SqliteUserVoiceStore(database), voices);
         TtsSynthesizer synthesizer = new TtsSynthesizer(voices, new FfmpegDecoder(), ttsPool, config.ttsMaxChunks());
         VoiceService voice = new VoiceService(synthesizer, config.ttsQueueCapacity());
         List<SlashCommand> commands = List.of(
@@ -59,7 +62,7 @@ public class Main {
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT)
                 .addEventListeners(
                         new CommandListener(commands),
-                        new TtsChatListener(voice, voices),
+                        new TtsChatListener(voice, preferences),
                         new VoiceStateListener(voice))
                 .setAudioModuleConfig(audioModuleConfig)
                 .enableCache(CacheFlag.VOICE_STATE)
