@@ -11,10 +11,14 @@ services:
       - TOKEN=${TOKEN}
       - PORT=${PORT:-8080}
       - TTS_LANGUAGE=${TTS_LANGUAGE:-ru}
+      - TTS_DEFAULT_VOICE=${TTS_DEFAULT_VOICE:-}
       - TTS_THREADS=${TTS_THREADS:-5}
       - TTS_QUEUE_CAPACITY=${TTS_QUEUE_CAPACITY:-10}
       - TTS_MAX_CHUNKS=${TTS_MAX_CHUNKS:-3}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DB_PATH=/app/data/bot.db
+    volumes:
+      - ./data:/app/data  # SQLite с голосами пользователей переживает пересборку контейнера
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8080}/health"]
       interval: 30s

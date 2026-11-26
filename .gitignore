@@ -42,4 +42,5 @@ build/
 .env
 bot.properties
 logs/
+data/
 .claude/worktrees/

@@ -17,7 +17,7 @@ import java.util.Properties;
  * в рабочей директории, затем берётся значение по умолчанию.
  */
 public record BotConfig(String token, int port, Voice ttsDefaultVoice, int ttsThreads, int ttsQueueCapacity,
-                        int ttsMaxChunks) {
+                        int ttsMaxChunks, Path dbPath) {
 
     private static final Logger log = LoggerFactory.getLogger(BotConfig.class);
     // Файл ищется в рабочей директории, а не в classpath: из src/main/resources он попадал в jar и Docker-образ.
@@ -31,6 +31,7 @@ public record BotConfig(String token, int port, Voice ttsDefaultVoice, int ttsTh
             throw new IllegalArgumentException("port must be 1..65535, got " + port);
         }
         Objects.requireNonNull(ttsDefaultVoice, "ttsDefaultVoice");
+        Objects.requireNonNull(dbPath, "dbPath");
         requirePositive("ttsThreads", ttsThreads);
         requirePositive("ttsQueueCapacity", ttsQueueCapacity);
         requirePositive("ttsMaxChunks", ttsMaxChunks);
@@ -60,7 +61,8 @@ public record BotConfig(String token, int port, Voice ttsDefaultVoice, int ttsTh
                 defaultVoice(source),
                 source.getInt("TTS_THREADS", "tts.threads", 5),
                 source.getInt("TTS_QUEUE_CAPACITY", "tts.queue-capacity", 10),
-                source.getInt("TTS_MAX_CHUNKS", "tts.max-chunks", 3));
+                source.getInt("TTS_MAX_CHUNKS", "tts.max-chunks", 3),
+                Path.of(source.get("DB_PATH", "db.path", "data/bot.db")));
         log.info("Configuration loaded: {}", config);
         return config;
     }
@@ -68,14 +70,14 @@ public record BotConfig(String token, int port, Voice ttsDefaultVoice, int ttsTh
     /** Без токена: конфигурация пишется в лог. */
     @Override
     public String toString() {
-        return "BotConfig[port=%d, ttsDefaultVoice=%s, ttsThreads=%d, ttsQueueCapacity=%d, ttsMaxChunks=%d]"
-                .formatted(port, ttsDefaultVoice, ttsThreads, ttsQueueCapacity, ttsMaxChunks);
+        return "BotConfig[port=%d, ttsDefaultVoice=%s, ttsThreads=%d, ttsQueueCapacity=%d, ttsMaxChunks=%d, dbPath=%s]"
+                .formatted(port, ttsDefaultVoice, ttsThreads, ttsQueueCapacity, ttsMaxChunks, dbPath);
     }
 
     /** TTS_DEFAULT_VOICE, а без него — google:TTS_LANGUAGE, чтобы старые .env работали как раньше. */
     private static Voice defaultVoice(Source source) {
         String voice = source.get("TTS_DEFAULT_VOICE", "tts.default-voice");
-        if (voice == null) {
+        if (voice == null || voice.isBlank()) { // docker-compose передаёт пустую строку, если переменная не задана
             return new Voice("google", source.get("TTS_LANGUAGE", "tts.language", "ru").strip());
         }
         try {

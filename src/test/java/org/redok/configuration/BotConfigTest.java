@@ -31,6 +31,7 @@ class BotConfigTest {
         assertEquals(7, config.ttsThreads());        // файл
         assertEquals(10, config.ttsQueueCapacity()); // по умолчанию
         assertEquals(3, config.ttsMaxChunks());      // по умолчанию
+        assertEquals(Path.of("data/bot.db"), config.dbPath()); // по умолчанию
     }
 
     @Test
@@ -49,6 +50,21 @@ class BotConfigTest {
     }
 
     @Test
+    void theDefaultVoiceWinsOverTheOldLanguageSetting() {
+        BotConfig config = BotConfig.load(
+                Map.of("TOKEN", "t", "TTS_LANGUAGE", "en", "TTS_DEFAULT_VOICE", "silero:xenia"), dir.resolve("none"));
+
+        assertEquals(new Voice("silero", "xenia"), config.ttsDefaultVoice());
+    }
+
+    @Test
+    void rejectsADefaultVoiceWithoutAProvider() {
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> BotConfig.load(Map.of("TOKEN", "t", "TTS_DEFAULT_VOICE", "ru"), dir.resolve("none")));
+        assertTrue(e.getMessage().contains("provider:id"), e.getMessage());
+    }
+
+    @Test
     void rejectsMoreChunksPerMessageThanTheQueueHolds() {
         assertThrows(IllegalArgumentException.class,
                 () -> BotConfig.load(Map.of("TOKEN", "t", "TTS_QUEUE_CAPACITY", "2"), dir.resolve("none")));
@@ -56,7 +72,7 @@ class BotConfigTest {
 
     @Test
     void toStringDoesNotLeakTheToken() {
-        BotConfig config = new BotConfig("secret-token", 8080, new Voice("google", "ru"), 5, 10, 3);
+        BotConfig config = new BotConfig("secret-token", 8080, new Voice("google", "ru"), 5, 10, 3, Path.of("bot.db"));
 
         assertFalse(config.toString().contains("secret-token"), config.toString());
     }

@@ -8,3 +8,4 @@ bot.properties
 .claude/
 target/
 logs/
+data/

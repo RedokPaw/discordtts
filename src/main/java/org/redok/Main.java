@@ -14,6 +14,7 @@ import org.redok.configuration.BotConfig;
 import org.redok.listeners.CommandListener;
 import org.redok.listeners.TtsChatListener;
 import org.redok.listeners.VoiceStateListener;
+import org.redok.storage.Database;
 import org.redok.tts.GoogleTranslateTts;
 import org.redok.tts.TtsSynthesizer;
 import org.redok.tts.VoiceRegistry;
@@ -35,6 +36,9 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
         BotConfig config = BotConfig.load();
+        // База открывается до подключения к Discord: сломанный файл или чужая схема видны сразу
+        Database database = Database.open(config.dbPath());
+        Runtime.getRuntime().addShutdownHook(new Thread(database::close, "db-close"));
 
         // Пул ограничивает, сколько кусков синтезируется одновременно (HTTP + ffmpeg) на весь бот.
         ExecutorService ttsPool = Executors.newFixedThreadPool(
