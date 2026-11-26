@@ -24,6 +24,25 @@ docker compose up -d && docker compose logs -f -t
 
 Голос один на пользователя и общий для всех серверов. Ответы `/voice` видны только автору. Голос записывается как `провайдер:id`: у Google голос — это язык (`google:ru`, `google:en`), своих голосов для одного языка у него нет. Выборы хранятся в SQLite (`DB_PATH`); в docker-compose файл лежит в `./data`, поэтому переживает пересборку контейнера.
 
+### Providers
+Провайдеры TTS включаются списком `TTS_PROVIDERS` (по умолчанию только `google`):
+
+| провайдер | голоса | |
+|---|---|---|
+| `google` | языки: `google:ru`, `google:en`… | неофициальный эндпоинт Google Translate, ничего ставить не нужно |
+| `silero` | `silero:xenia`, `silero:kseniya`, `silero:baya` (женские), `silero:aidar`, `silero:eugene` (мужские) | отдельный контейнер из `silero/`, только русский |
+
+Silero поднимается профилем compose, без профиля контейнер не собирается и не запускается:
+```bash
+# в .env: TTS_PROVIDERS=google,silero
+docker compose --profile silero up -d
+```
+Контейнер весит ~1.3 ГБ, занимает ~400–600 МиБ памяти и синтезирует фразу за 50–150 мс на 2 потоках CPU (нужен x86 с AVX2). Цифры и латиницу модель не знает, поэтому сервис сам превращает их в слова (`21:30`, `gg wp`, `rush B`); правила — в `silero/normalize.py`.
+
+Бот не ждёт Silero: он проверяет `/health` раз в 15 секунд, и пока Silero не готов или упал, его голоса читаются голосом по умолчанию — поэтому голос по умолчанию лучше держать на Google. Если выключить провайдера в `TTS_PROVIDERS`, его голоса пропадут из подсказок `/voice`, а выбор пользователей сохранится и вернётся, когда провайдер снова включат.
+
+Модели Silero распространяются по лицензии [CC BY-NC-SA 4.0](https://github.com/snakers4/silero-models): только некоммерческое использование, с указанием авторства.
+
 ### Settings
 Каждая настройка ищется в переменной окружения, затем в `bot.properties`, затем берётся значение по умолчанию.
 
@@ -34,9 +53,12 @@ docker compose up -d && docker compose logs -f -t
 | `TTS_DEFAULT_VOICE` | `tts.default-voice` | google:`TTS_LANGUAGE` | голос тех, кто не выбрал свой |
 | `TTS_LANGUAGE` | `tts.language` | ru | устарело: язык Google для голоса по умолчанию, если не задан `TTS_DEFAULT_VOICE` |
 | `DB_PATH` | `db.path` | data/bot.db | файл SQLite с голосами пользователей (в docker-compose — `/app/data/bot.db`) |
+| `TTS_PROVIDERS` | `tts.providers` | google | включённые провайдеры через запятую: `google`, `silero` |
+| `SILERO_URL` | `silero.url` | — | адрес сервиса Silero, нужен с `silero` в списке (в docker-compose — `http://silero:8000`) |
+| `SILERO_THREADS` | — | 2 | только docker-compose: потоки torch в контейнере Silero |
 | `TTS_THREADS` | `tts.threads` | 5 | сколько кусков синтезируется одновременно (HTTP + ffmpeg) на весь бот |
 | `TTS_QUEUE_CAPACITY` | `tts.queue-capacity` | 10 | мест в очереди гильдии; кусок до 200 символов занимает одно место |
-| `TTS_MAX_CHUNKS` | `tts.max-chunks` | 3 | сколько кусков по 200 символов читать из одного сообщения |
+| `TTS_MAX_CHUNKS` | `tts.max-chunks` | 3 | сколько кусков читать из одного сообщения; кусок — до 200 символов у Google и до 500 у Silero |
 | `LOG_LEVEL` | — | INFO | `DEBUG` показывает путь каждого куска: нарезка, очередь, синтез, воспроизведение |
 
 ### Tests

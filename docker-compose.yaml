@@ -12,6 +12,8 @@ services:
       - PORT=${PORT:-8080}
       - TTS_LANGUAGE=${TTS_LANGUAGE:-ru}
       - TTS_DEFAULT_VOICE=${TTS_DEFAULT_VOICE:-}
+      - TTS_PROVIDERS=${TTS_PROVIDERS:-google}
+      - SILERO_URL=${SILERO_URL:-http://silero:8000}  # нужен, только если silero есть в TTS_PROVIDERS
       - TTS_THREADS=${TTS_THREADS:-5}
       - TTS_QUEUE_CAPACITY=${TTS_QUEUE_CAPACITY:-10}
       - TTS_MAX_CHUNKS=${TTS_MAX_CHUNKS:-3}
@@ -25,3 +27,16 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+
+  # Silero TTS: поднимается только с профилем — docker compose --profile silero up -d
+  # и включается в боте через TTS_PROVIDERS=google,silero. Бот его не ждёт: пока Silero
+  # не готов или упал, его голоса читаются голосом по умолчанию.
+  silero:
+    profiles: [silero]
+    build:
+      context: ./silero
+    container_name: discordtts-silero
+    restart: unless-stopped
+    environment:
+      - TORCH_THREADS=${SILERO_THREADS:-2}
+    mem_limit: 1g  # ~400 МиБ в простое, пик под нагрузкой ~650 МиБ

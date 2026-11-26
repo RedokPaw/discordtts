@@ -6,8 +6,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -17,7 +23,7 @@ import java.util.Properties;
  * в рабочей директории, затем берётся значение по умолчанию.
  */
 public record BotConfig(String token, int port, Voice ttsDefaultVoice, int ttsThreads, int ttsQueueCapacity,
-                        int ttsMaxChunks, Path dbPath) {
+                        int ttsMaxChunks, Path dbPath, List<String> ttsProviders, URI sileroUrl) {
 
     private static final Logger log = LoggerFactory.getLogger(BotConfig.class);
     // Файл ищется в рабочей директории, а не в classpath: из src/main/resources он попадал в jar и Docker-образ.
@@ -32,6 +38,14 @@ public record BotConfig(String token, int port, Voice ttsDefaultVoice, int ttsTh
         }
         Objects.requireNonNull(ttsDefaultVoice, "ttsDefaultVoice");
         Objects.requireNonNull(dbPath, "dbPath");
+        ttsProviders = List.copyOf(ttsProviders);
+        if (ttsProviders.isEmpty()) {
+            throw new IllegalArgumentException("at least one TTS provider is needed");
+        }
+        if (new HashSet<>(ttsProviders).size() != ttsProviders.size()) {
+            throw new IllegalArgumentException("TTS providers repeat: " + ttsProviders);
+        }
+        // sileroUrl может быть null: он нужен, только если silero есть в ttsProviders
         requirePositive("ttsThreads", ttsThreads);
         requirePositive("ttsQueueCapacity", ttsQueueCapacity);
         requirePositive("ttsMaxChunks", ttsMaxChunks);
@@ -62,7 +76,9 @@ public record BotConfig(String token, int port, Voice ttsDefaultVoice, int ttsTh
                 source.getInt("TTS_THREADS", "tts.threads", 5),
                 source.getInt("TTS_QUEUE_CAPACITY", "tts.queue-capacity", 10),
                 source.getInt("TTS_MAX_CHUNKS", "tts.max-chunks", 3),
-                Path.of(source.get("DB_PATH", "db.path", "data/bot.db")));
+                Path.of(source.get("DB_PATH", "db.path", "data/bot.db")),
+                providers(source),
+                sileroUrl(source));
         log.info("Configuration loaded: {}", config);
         return config;
     }
@@ -70,8 +86,39 @@ public record BotConfig(String token, int port, Voice ttsDefaultVoice, int ttsTh
     /** Без токена: конфигурация пишется в лог. */
     @Override
     public String toString() {
-        return "BotConfig[port=%d, ttsDefaultVoice=%s, ttsThreads=%d, ttsQueueCapacity=%d, ttsMaxChunks=%d, dbPath=%s]"
-                .formatted(port, ttsDefaultVoice, ttsThreads, ttsQueueCapacity, ttsMaxChunks, dbPath);
+        return ("BotConfig[port=%d, ttsDefaultVoice=%s, ttsThreads=%d, ttsQueueCapacity=%d, ttsMaxChunks=%d, dbPath=%s, "
+                + "ttsProviders=%s, sileroUrl=%s]")
+                .formatted(port, ttsDefaultVoice, ttsThreads, ttsQueueCapacity, ttsMaxChunks, dbPath, ttsProviders,
+                        sileroUrl);
+    }
+
+    /** TTS_PROVIDERS через запятую, без учёта регистра и пробелов; по умолчанию только google. */
+    private static List<String> providers(Source source) {
+        String value = source.get("TTS_PROVIDERS", "tts.providers");
+        if (value == null || value.isBlank()) {
+            return List.of("google");
+        }
+        return Arrays.stream(value.split(","))
+                .map(name -> name.strip().toLowerCase(Locale.ROOT))
+                .filter(name -> !name.isEmpty())
+                .toList();
+    }
+
+    private static URI sileroUrl(Source source) {
+        String value = source.get("SILERO_URL", "silero.url");
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            URI uri = new URI(value.strip());
+            if (uri.getScheme() == null || uri.getHost() == null) {
+                throw new URISyntaxException(value, "needs scheme and host");
+            }
+            return uri;
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException("SILERO_URL / silero.url must be a URL like http://silero:8000, got '"
+                    + value + "'");
+        }
     }
 
     /** TTS_DEFAULT_VOICE, а без него — google:TTS_LANGUAGE, чтобы старые .env работали как раньше. */

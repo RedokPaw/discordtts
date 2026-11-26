@@ -7,10 +7,13 @@ import org.redok.tts.Voice;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.net.URI;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,6 +35,8 @@ class BotConfigTest {
         assertEquals(10, config.ttsQueueCapacity()); // по умолчанию
         assertEquals(3, config.ttsMaxChunks());      // по умолчанию
         assertEquals(Path.of("data/bot.db"), config.dbPath()); // по умолчанию
+        assertEquals(List.of("google"), config.ttsProviders()); // по умолчанию
+        assertNull(config.sileroUrl());                        // по умолчанию
     }
 
     @Test
@@ -65,6 +70,35 @@ class BotConfigTest {
     }
 
     @Test
+    void readsTheProviderListLoosely() {
+        BotConfig config = BotConfig.load(Map.of("TOKEN", "t", "TTS_PROVIDERS", " Google, silero ,",
+                "SILERO_URL", "http://silero:8000"), dir.resolve("none"));
+
+        assertEquals(List.of("google", "silero"), config.ttsProviders());
+        assertEquals(URI.create("http://silero:8000"), config.sileroUrl());
+    }
+
+    @Test
+    void anEmptyProviderListFromComposeMeansGoogle() {
+        BotConfig config = BotConfig.load(Map.of("TOKEN", "t", "TTS_PROVIDERS", ""), dir.resolve("none"));
+
+        assertEquals(List.of("google"), config.ttsProviders());
+    }
+
+    @Test
+    void rejectsRepeatedProviders() {
+        assertThrows(IllegalArgumentException.class,
+                () -> BotConfig.load(Map.of("TOKEN", "t", "TTS_PROVIDERS", "google,google"), dir.resolve("none")));
+    }
+
+    @Test
+    void rejectsABadSileroUrl() {
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> BotConfig.load(Map.of("TOKEN", "t", "SILERO_URL", "silero:8000"), dir.resolve("none")));
+        assertTrue(e.getMessage().contains("SILERO_URL"), e.getMessage());
+    }
+
+    @Test
     void rejectsMoreChunksPerMessageThanTheQueueHolds() {
         assertThrows(IllegalArgumentException.class,
                 () -> BotConfig.load(Map.of("TOKEN", "t", "TTS_QUEUE_CAPACITY", "2"), dir.resolve("none")));
@@ -72,7 +106,8 @@ class BotConfigTest {
 
     @Test
     void toStringDoesNotLeakTheToken() {
-        BotConfig config = new BotConfig("secret-token", 8080, new Voice("google", "ru"), 5, 10, 3, Path.of("bot.db"));
+        BotConfig config = new BotConfig("secret-token", 8080, new Voice("google", "ru"), 5, 10, 3, Path.of("bot.db"),
+                List.of("google"), null);
 
         assertFalse(config.toString().contains("secret-token"), config.toString());
     }
