@@ -1,6 +1,5 @@
 package org.redok.tts;
 
-import net.dv8tion.jda.api.audio.AudioSendHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,9 +15,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,7 +23,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 //TODO: Отделить гуглттс, сделать аудиопровайдера кастомайзбл, конвертирование тоже увести в другой класс
-public class TTSMessageHandlerImpl implements TTSMessageHandler {
+/** Текст → PCM: режет на куски, синтезирует и декодирует в пуле потоков, кладёт результат в слоты очереди. */
+public class TtsSynthesizer {
 
     private static final int MAX_TTS_LENGTH = 200;       // больше Google TTS не принимает: на 201 символ отвечает 400
     private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(15);
@@ -34,11 +32,9 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
     private static final String TTS_URL =
             "https://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&client=tw-ob&tl=%s&q=%s";
 
-    private static final Logger log = LoggerFactory.getLogger(TTSMessageHandlerImpl.class);
+    private static final Logger log = LoggerFactory.getLogger(TtsSynthesizer.class);
     private final String language;
-    private final int queueCapacity;
     private final int maxChunksPerMessage; // сколько кусков по MAX_TTS_LENGTH читать из одного сообщения
-    private final Map<String, AudioSendHandlerImpl> handlerPerGuild = new HashMap<>();
     // Пул сам ограничивает параллельность: не больше threads синтезов (HTTP + ffmpeg) на весь бот.
     private final ExecutorService synthPool;
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -55,52 +51,30 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
             "pipe:1"
     ).redirectError(ProcessBuilder.Redirect.DISCARD); // stderr никто не читает — не даём ему забить пайп
 
-    public TTSMessageHandlerImpl(String language, int threads, int queueCapacity, int maxChunksPerMessage) {
+    public TtsSynthesizer(String language, int threads, int maxChunksPerMessage) {
         this.language = language;
-        this.queueCapacity = queueCapacity;
         this.maxChunksPerMessage = maxChunksPerMessage;
         this.synthPool = Executors.newFixedThreadPool(threads, Thread.ofPlatform().name("tts-", 1).factory());
     }
 
-    @Override
-    public boolean handleMessageAndSpeak(String text, String guildId) {
-        AudioSendHandlerImpl handler = handlerPerGuild.get(guildId);
-        if (handler == null) {
-            return false;
-        }
-        List<String> chunks = splitForTts(text, maxChunksPerMessage);
-        if (chunks.isEmpty()) {
-            return true; // произносить нечего — это не переполнение очереди
-        }
-        // Места занимаются сразу, в порядке прихода сообщений: проверка ёмкости и вставка — одно действие.
-        List<CompletableFuture<ByteBuffer>> slots = handler.reserveSlots(chunks.size());
-        if (slots.isEmpty()) {
-            return false;
-        }
-        for (int i = 0; i < chunks.size(); i++) {
-            CompletableFuture<ByteBuffer> slot = slots.get(i);
-            String chunk = chunks.get(i);
-            synthPool.execute(() -> synthesizeInto(slot, chunk, guildId));
-        }
-        return true;
+    /** Режет текст на куски, которые Google TTS примет за один запрос; не больше maxChunksPerMessage кусков. */
+    public List<String> split(String text) {
+        return splitForTts(text, maxChunksPerMessage);
     }
 
-    @Override
-    public AudioSendHandler registerGuild(String guildId) {
-        AudioSendHandlerImpl audioSendHandler = new AudioSendHandlerImpl(queueCapacity);
-        AudioSendHandlerImpl previous = handlerPerGuild.put(guildId, audioSendHandler);
-        if (previous != null) {
-            previous.clear(); // повторный /join: старая очередь больше никому не нужна
-        }
-        return audioSendHandler;
-    }
-
-    @Override
-    public void unregisterGuild(String guildId) {
-        AudioSendHandlerImpl handler = handlerPerGuild.remove(guildId);
-        if (handler != null) {
-            handler.clear();
-        }
+    /** Синтезирует кусок в пуле и кладёт PCM в слот; ошибку синтеза — тоже в слот. */
+    public void synthesizeInto(CompletableFuture<ByteBuffer> slot, String text, String guildId) {
+        synthPool.execute(() -> {
+            if (slot.isDone()) {
+                return; // бот уже вышел (слот отменён) или слот просрочен — не тратим ресурсы
+            }
+            try {
+                slot.complete(convertAudioToPCM(getAudioFromGoogleTTS(text)));
+            } catch (Exception e) {
+                log.warn("TTS failed in guild {}", guildId, e);
+                slot.completeExceptionally(e);
+            }
+        });
     }
 
     /**
@@ -132,18 +106,6 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
         if (!chunk.isEmpty()) {
             chunks.add(chunk.toString());
             chunk.setLength(0);
-        }
-    }
-
-    private void synthesizeInto(CompletableFuture<ByteBuffer> slot, String text, String guildId) {
-        if (slot.isDone()) {
-            return; // бот уже вышел (слот отменён) или слот просрочен — не тратим ресурсы
-        }
-        try {
-            slot.complete(convertAudioToPCM(getAudioFromGoogleTTS(text)));
-        } catch (Exception e) {
-            log.warn("TTS failed in guild {}", guildId, e);
-            slot.completeExceptionally(e);
         }
     }
 

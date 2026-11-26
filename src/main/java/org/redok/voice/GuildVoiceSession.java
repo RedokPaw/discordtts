@@ -1,8 +1,9 @@
-package org.redok.tts;
+package org.redok.voice;
 
 import net.dv8tion.jda.api.audio.AudioSendHandler;
 
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -11,19 +12,29 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-
-public class AudioSendHandlerImpl implements AudioSendHandler {
+/**
+ * Очередь речи одной гильдии и источник звука для JDA. Слоты резервируются в порядке прихода
+ * сообщений и заполняются синтезом позже; аудиопоток играет только голову очереди.
+ */
+public class GuildVoiceSession implements AudioSendHandler {
 
     private static final int FRAME_SIZE = 3840; // 20 мс PCM: 48000 Гц × 2 канала × 2 байта × 0.02 с
-    private static final long SLOT_TIMEOUT_SECONDS = 30;
+    private static final Duration DEFAULT_SLOT_TIMEOUT = Duration.ofSeconds(30);
 
     // Слоты в порядке прихода сообщений. Слот — обещание PCM-буфера, который, возможно, ещё синтезируется.
     private final BlockingQueue<CompletableFuture<ByteBuffer>> ttsQueue;
+    private final Duration slotTimeout;
     private final ByteBuffer frame = ByteBuffer.allocate(FRAME_SIZE);
     private ByteBuffer ttsBuffer; // играющий сейчас буфер; трогает только аудиопоток JDA
 
-    public AudioSendHandlerImpl(int capacity) {
+    public GuildVoiceSession(int capacity) {
+        this(capacity, DEFAULT_SLOT_TIMEOUT);
+    }
+
+    /** Таймаут слота меняется только в тестах. */
+    GuildVoiceSession(int capacity, Duration slotTimeout) {
         this.ttsQueue = new LinkedBlockingQueue<>(capacity);
+        this.slotTimeout = slotTimeout;
     }
 
     /**
@@ -40,14 +51,14 @@ public class AudioSendHandlerImpl implements AudioSendHandler {
         for (int i = 0; i < count; i++) {
             // Таймаут гарантирует, что слот разрешится: зависший синтез не заблокирует очередь навсегда.
             CompletableFuture<ByteBuffer> slot = new CompletableFuture<ByteBuffer>()
-                    .orTimeout(SLOT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    .orTimeout(slotTimeout.toMillis(), TimeUnit.MILLISECONDS);
             ttsQueue.add(slot); // место есть: добавляем только здесь (synchronized), аудиопоток лишь освобождает
             slots.add(slot);
         }
         return slots;
     }
 
-    /** При выходе из канала: отменяем все ожидающие слоты, их буферы сразу становятся мусором. */
+    /** Отменяет все ожидающие слоты, их буферы сразу становятся мусором. */
     public void clear() {
         CompletableFuture<ByteBuffer> slot;
         while ((slot = ttsQueue.poll()) != null) {

@@ -1,28 +1,33 @@
-package org.redok.commands;
+package org.redok.listeners;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.InteractionHook;
+import org.jetbrains.annotations.NotNull;
+import org.redok.commands.SlashCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-public class BotCommandHandler {
+/** Передаёт слэш-команду обработчику с тем же именем. */
+public class CommandListener extends ListenerAdapter {
 
-    private static final Logger log = LoggerFactory.getLogger(BotCommandHandler.class);
-    private final HashMap<String, SlashCommand> commands = new HashMap<>();
+    private static final Logger log = LoggerFactory.getLogger(CommandListener.class);
+    private final Map<String, SlashCommand> commands = new HashMap<>();
 
-    public BotCommandHandler(List<SlashCommand> commandList) {
+    public CommandListener(List<SlashCommand> commandList) {
         log.debug("Registering commands");
         for (SlashCommand command : commandList) {
             commands.put(command.getSlashCommandData().getName(), command);
         }
     }
 
-    public void doCommand(SlashCommandInteractionEvent event) {
+    @Override
+    public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event) {
         SlashCommand slashCommand = commands.get(event.getName());
         if (slashCommand != null) {
             slashCommand.onSlashCommandInteraction(event);
@@ -32,9 +37,5 @@ public class BotCommandHandler {
                     .flatMap(InteractionHook::deleteOriginal)
                     .queue();
         }
-    }
-
-    public List<SlashCommand> getCommands() {
-        return new ArrayList<>(commands.values());
     }
 }

@@ -8,20 +8,19 @@ import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
-import org.redok.bot.BotController;
+import org.redok.voice.VoiceService;
 
 import java.time.Duration;
-import java.util.Objects;
 
 public class LeaveChannelCommand implements SlashCommand {
 
     // Только серверы: по умолчанию команда доступна и в ЛС с ботом, где getMember() == null
-    private final static SlashCommandData commandData = Commands.slash("leave", "Leave user channel")
+    private static final SlashCommandData commandData = Commands.slash("leave", "Leave user channel")
             .setContexts(InteractionContextType.GUILD);
-    private final BotController botController;
+    private final VoiceService voice;
 
-    public LeaveChannelCommand(BotController botController) {
-        this.botController = botController;
+    public LeaveChannelCommand(VoiceService voice) {
+        this.voice = voice;
     }
 
     @Override
@@ -39,10 +38,8 @@ public class LeaveChannelCommand implements SlashCommand {
             replyCallbackAction = event.reply("Гильдия не найдена, команда введена на сервере?");
         } else if (voiceState == null || !voiceState.inAudioChannel()) {
             replyCallbackAction = event.reply("Вы не в голосовом канале");
-        } else if (voiceState.getChannel().getMembers()
-                .stream()
-                .anyMatch(m -> Objects.equals(event.getJDA().getSelfUser().getId(), m.getId()))) {
-            botController.leaveVoiceChannel(event.getGuild());
+        } else if (voice.isBotIn(voiceState.getChannel())) {
+            voice.leave(event.getGuild());
             replyCallbackAction = event.reply("Left the voice channel");
         } else {
             replyCallbackAction = event.reply("Я не в вашем голосовом канале");

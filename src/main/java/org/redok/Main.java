@@ -6,15 +6,15 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.audio.AudioModuleConfig;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
-import org.redok.bot.BotController;
-import org.redok.commands.BotCommandHandler;
 import org.redok.commands.JoinChannelCommand;
 import org.redok.commands.LeaveChannelCommand;
 import org.redok.commands.SlashCommand;
 import org.redok.configuration.BotConfig;
-import org.redok.listeners.EventControllerListener;
-import org.redok.tts.TTSMessageHandler;
-import org.redok.tts.TTSMessageHandlerImpl;
+import org.redok.listeners.CommandListener;
+import org.redok.listeners.TtsChatListener;
+import org.redok.listeners.VoiceStateListener;
+import org.redok.tts.TtsSynthesizer;
+import org.redok.voice.VoiceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,12 +29,11 @@ public class Main {
     public static void main(String[] args) throws IOException {
         BotConfig config = BotConfig.load();
 
-        TTSMessageHandler ttsMessageHandler = new TTSMessageHandlerImpl(
-                config.ttsLanguage(), config.ttsThreads(), config.ttsQueueCapacity(), config.ttsMaxChunks());
-        BotController botController = new BotController(ttsMessageHandler);
+        TtsSynthesizer synthesizer = new TtsSynthesizer(config.ttsLanguage(), config.ttsThreads(), config.ttsMaxChunks());
+        VoiceService voice = new VoiceService(synthesizer, config.ttsQueueCapacity());
         List<SlashCommand> commands = List.of(
-                new JoinChannelCommand(botController),
-                new LeaveChannelCommand(botController));
+                new JoinChannelCommand(voice),
+                new LeaveChannelCommand(voice));
 
         log.info("Starting bot");
         AudioModuleConfig audioModuleConfig = new AudioModuleConfig()
@@ -43,8 +42,10 @@ public class Main {
         JDA jda = JDABuilder
                 .createDefault(config.token())
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT)
-                .addEventListeners(new EventControllerListener(
-                        new BotCommandHandler(commands), ttsMessageHandler, botController))
+                .addEventListeners(
+                        new CommandListener(commands),
+                        new TtsChatListener(voice),
+                        new VoiceStateListener(voice))
                 .setAudioModuleConfig(audioModuleConfig)
                 .enableCache(CacheFlag.VOICE_STATE)
                 .build();
