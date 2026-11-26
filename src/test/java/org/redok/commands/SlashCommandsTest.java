@@ -34,7 +34,7 @@ class SlashCommandsTest {
     private final Member bot = stubs.stub(Member.class, "getId", "1");
     private final Guild guild = stubs.stub(Guild.class, "getId", "g", "getAudioManager", stubs.stub(AudioManager.class));
     private final VoiceService voice =
-            new VoiceService(new TtsSynthesizer(new FakeTts(200), encoded -> encoded, Runnable::run, 3), 10);
+            new VoiceService(new TtsSynthesizer(new FakeTts(200).registry(), encoded -> encoded, Runnable::run, 3), 10);
     private final SlashCommand join = new JoinChannelCommand(voice);
     private final SlashCommand leave = new LeaveChannelCommand(voice);
 

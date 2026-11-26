@@ -2,6 +2,7 @@ package org.redok.configuration;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.redok.tts.Voice;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,7 +27,7 @@ class BotConfigTest {
 
         assertEquals("file-token", config.token());  // файл
         assertEquals(8080, config.port());           // env сильнее файла
-        assertEquals("en", config.ttsLanguage());    // env
+        assertEquals(new Voice("google", "en"), config.ttsDefaultVoice()); // env, старое TTS_LANGUAGE
         assertEquals(7, config.ttsThreads());        // файл
         assertEquals(10, config.ttsQueueCapacity()); // по умолчанию
         assertEquals(3, config.ttsMaxChunks());      // по умолчанию
@@ -55,7 +56,7 @@ class BotConfigTest {
 
     @Test
     void toStringDoesNotLeakTheToken() {
-        BotConfig config = new BotConfig("secret-token", 8080, "ru", 5, 10, 3);
+        BotConfig config = new BotConfig("secret-token", 8080, new Voice("google", "ru"), 5, 10, 3);
 
         assertFalse(config.toString().contains("secret-token"), config.toString());
     }

@@ -44,18 +44,18 @@ class TtsSynthesizerTest {
 
     @Test
     void splitUsesTheEngineLimitAndMaxChunks() {
-        TtsSynthesizer synthesizer = new TtsSynthesizer(new FakeTts(10), encoded -> encoded, Runnable::run, 2);
+        TtsSynthesizer synthesizer = new TtsSynthesizer(new FakeTts(10).registry(), encoded -> encoded, Runnable::run, 2);
 
-        assertEquals(List.of("раз два", "три четыре"), synthesizer.split("раз два три четыре пять шесть"));
+        assertEquals(List.of("раз два", "три четыре"), synthesizer.split("раз два три четыре пять шесть", FakeTts.VOICE));
     }
 
     @Test
     void synthesizeIntoCompletesTheSlotWithDecodedAudio() {
         AudioDecoder upperCase = encoded -> new String(encoded, UTF_8).toUpperCase().getBytes(UTF_8);
-        TtsSynthesizer synthesizer = new TtsSynthesizer(new FakeTts(200), upperCase, Runnable::run, 3);
+        TtsSynthesizer synthesizer = new TtsSynthesizer(new FakeTts(200).registry(), upperCase, Runnable::run, 3);
         CompletableFuture<ByteBuffer> slot = new CompletableFuture<>();
 
-        synthesizer.synthesizeInto(slot, "привет", "g");
+        synthesizer.synthesizeInto(slot, "привет", FakeTts.VOICE, "g");
 
         assertEquals("ПРИВЕТ", UTF_8.decode(slot.join()).toString());
     }
@@ -64,10 +64,10 @@ class TtsSynthesizerTest {
     void synthesizeIntoPutsTheErrorIntoTheSlot() {
         FakeTts engine = new FakeTts(200);
         engine.failWith(new IOException("Google TTS answered HTTP 400"));
-        TtsSynthesizer synthesizer = new TtsSynthesizer(engine, encoded -> encoded, Runnable::run, 3);
+        TtsSynthesizer synthesizer = new TtsSynthesizer(engine.registry(), encoded -> encoded, Runnable::run, 3);
         CompletableFuture<ByteBuffer> slot = new CompletableFuture<>();
 
-        synthesizer.synthesizeInto(slot, "привет", "g");
+        synthesizer.synthesizeInto(slot, "привет", FakeTts.VOICE, "g");
 
         ExecutionException e = assertThrows(ExecutionException.class, slot::get);
         assertInstanceOf(IOException.class, e.getCause());
@@ -76,12 +76,27 @@ class TtsSynthesizerTest {
     @Test
     void synthesizeIntoSkipsACancelledSlot() {
         FakeTts engine = new FakeTts(200);
-        TtsSynthesizer synthesizer = new TtsSynthesizer(engine, encoded -> encoded, Runnable::run, 3);
+        TtsSynthesizer synthesizer = new TtsSynthesizer(engine.registry(), encoded -> encoded, Runnable::run, 3);
         CompletableFuture<ByteBuffer> slot = new CompletableFuture<>();
         slot.cancel(false);
 
-        synthesizer.synthesizeInto(slot, "привет", "g");
+        synthesizer.synthesizeInto(slot, "привет", FakeTts.VOICE, "g");
 
         assertTrue(engine.texts().isEmpty(), "незачем ходить в Google ради слота, который никто не ждёт");
+    }
+
+    @Test
+    void synthesizesWithTheEngineAndVoiceOfTheChunk() {
+        FakeTts first = new FakeTts("first", 200);
+        FakeTts second = new FakeTts("second", 5);
+        VoiceRegistry voices = new VoiceRegistry(List.of(first, second), new Voice("first", "a"));
+        TtsSynthesizer synthesizer = new TtsSynthesizer(voices, encoded -> encoded, Runnable::run, 3);
+
+        synthesizer.synthesizeInto(new CompletableFuture<>(), "привет", new Voice("second", "b"), "g");
+
+        assertTrue(first.texts().isEmpty());
+        assertEquals(List.of(new Voice("second", "b")), second.voicesUsed());
+        assertEquals(List.of("раз", "два"), synthesizer.split("раз два", new Voice("second", "a")),
+                "лимит длины берётся у движка голоса");
     }
 }

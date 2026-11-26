@@ -40,7 +40,7 @@ class VoiceStateListenerTest {
 
     @BeforeEach
     void setUp() {
-        voice = new VoiceService(new TtsSynthesizer(new FakeTts(200), encoded -> encoded, Runnable::run, 3), 10);
+        voice = new VoiceService(new TtsSynthesizer(new FakeTts(200).registry(), encoded -> encoded, Runnable::run, 3), 10);
         listener = new VoiceStateListener(voice);
     }
 
@@ -52,7 +52,7 @@ class VoiceStateListenerTest {
         listener.onGuildVoiceUpdate(new GuildVoiceUpdateEvent(jda, 0, member("2", null), channel));
 
         assertTrue(stubs.called("AudioManager.closeAudioConnection"));
-        assertEquals(SpeakResult.NOT_CONNECTED, voice.speak(guild, "привет"));
+        assertEquals(SpeakResult.NOT_CONNECTED, voice.speak(guild, "привет", FakeTts.VOICE));
     }
 
     @Test
@@ -82,14 +82,14 @@ class VoiceStateListenerTest {
     void dropsQueuedSpeechWhenTheBotIsDisconnected() {
         AudioChannelUnion channel = channel("42");
         voice.join(guild, channel);
-        voice.speak(guild, "привет");
+        voice.speak(guild, "привет", FakeTts.VOICE);
 
         // бот ушёл из канала и никуда не пришёл: так выглядит кик модератором
         listener.onGuildVoiceUpdate(new GuildVoiceUpdateEvent(jda, 0, bot, channel));
 
         assertFalse(session.get().canProvide(), "ожидающая речь выброшена");
         assertFalse(stubs.called("closeAudioConnection"), "соединением распоряжается JDA");
-        assertEquals(SpeakResult.QUEUED, voice.speak(guild, "привет"), "сессия осталась на случай переподключения");
+        assertEquals(SpeakResult.QUEUED, voice.speak(guild, "привет", FakeTts.VOICE), "сессия осталась на случай переподключения");
     }
 
     @Test
@@ -97,7 +97,7 @@ class VoiceStateListenerTest {
         AudioChannelUnion from = channel("42");
         AudioChannelUnion to = channel("43");
         voice.join(guild, from);
-        voice.speak(guild, "привет");
+        voice.speak(guild, "привет", FakeTts.VOICE);
 
         listener.onGuildVoiceUpdate(new GuildVoiceUpdateEvent(jda, 0, member("1", to), from));
 

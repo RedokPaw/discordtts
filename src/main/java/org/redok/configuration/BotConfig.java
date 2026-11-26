@@ -1,5 +1,6 @@
 package org.redok.configuration;
 
+import org.redok.tts.Voice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -8,13 +9,14 @@ import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 
 /**
  * Настройки бота. Каждое значение ищется в переменной окружения, затем в bot.properties
  * в рабочей директории, затем берётся значение по умолчанию.
  */
-public record BotConfig(String token, int port, String ttsLanguage, int ttsThreads, int ttsQueueCapacity,
+public record BotConfig(String token, int port, Voice ttsDefaultVoice, int ttsThreads, int ttsQueueCapacity,
                         int ttsMaxChunks) {
 
     private static final Logger log = LoggerFactory.getLogger(BotConfig.class);
@@ -28,6 +30,7 @@ public record BotConfig(String token, int port, String ttsLanguage, int ttsThrea
         if (port < 1 || port > 65535) {
             throw new IllegalArgumentException("port must be 1..65535, got " + port);
         }
+        Objects.requireNonNull(ttsDefaultVoice, "ttsDefaultVoice");
         requirePositive("ttsThreads", ttsThreads);
         requirePositive("ttsQueueCapacity", ttsQueueCapacity);
         requirePositive("ttsMaxChunks", ttsMaxChunks);
@@ -54,7 +57,7 @@ public record BotConfig(String token, int port, String ttsLanguage, int ttsThrea
         BotConfig config = new BotConfig(
                 token,
                 source.getInt("PORT", "port", 8081),
-                source.get("TTS_LANGUAGE", "tts.language", "ru"),
+                defaultVoice(source),
                 source.getInt("TTS_THREADS", "tts.threads", 5),
                 source.getInt("TTS_QUEUE_CAPACITY", "tts.queue-capacity", 10),
                 source.getInt("TTS_MAX_CHUNKS", "tts.max-chunks", 3));
@@ -65,8 +68,22 @@ public record BotConfig(String token, int port, String ttsLanguage, int ttsThrea
     /** Без токена: конфигурация пишется в лог. */
     @Override
     public String toString() {
-        return "BotConfig[port=%d, ttsLanguage=%s, ttsThreads=%d, ttsQueueCapacity=%d, ttsMaxChunks=%d]"
-                .formatted(port, ttsLanguage, ttsThreads, ttsQueueCapacity, ttsMaxChunks);
+        return "BotConfig[port=%d, ttsDefaultVoice=%s, ttsThreads=%d, ttsQueueCapacity=%d, ttsMaxChunks=%d]"
+                .formatted(port, ttsDefaultVoice, ttsThreads, ttsQueueCapacity, ttsMaxChunks);
+    }
+
+    /** TTS_DEFAULT_VOICE, а без него — google:TTS_LANGUAGE, чтобы старые .env работали как раньше. */
+    private static Voice defaultVoice(Source source) {
+        String voice = source.get("TTS_DEFAULT_VOICE", "tts.default-voice");
+        if (voice == null) {
+            return new Voice("google", source.get("TTS_LANGUAGE", "tts.language", "ru").strip());
+        }
+        try {
+            return Voice.parse(voice);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("TTS_DEFAULT_VOICE / tts.default-voice must look like provider:id "
+                    + "(for example google:ru), got '" + voice + "'");
+        }
     }
 
     private static Properties loadFromFile(Path propertiesFile) {

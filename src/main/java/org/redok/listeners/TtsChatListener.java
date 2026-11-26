@@ -7,6 +7,7 @@ import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jetbrains.annotations.NotNull;
+import org.redok.tts.VoiceRegistry;
 import org.redok.utils.UrlReplacer;
 import org.redok.voice.VoiceService;
 import org.redok.voice.VoiceService.SpeakResult;
@@ -25,9 +26,11 @@ public class TtsChatListener extends ListenerAdapter {
     static final String SKIP_PREFIX = "!";
     private static final Logger log = LoggerFactory.getLogger(TtsChatListener.class);
     private final VoiceService voice;
+    private final VoiceRegistry voices;
 
-    public TtsChatListener(VoiceService voice) {
+    public TtsChatListener(VoiceService voice, VoiceRegistry voices) {
         this.voice = voice;
+        this.voices = voices;
     }
 
     @Override
@@ -62,7 +65,7 @@ public class TtsChatListener extends ListenerAdapter {
         String text = UrlReplacer.replaceUrlsWithDomains(content);
         log.debug("message {} accepted: {} chars ({} after replacing URLs)", event.getMessageId(), content.length(),
                 text.length());
-        if (voice.speak(event.getGuild(), text) == SpeakResult.QUEUE_FULL) {
+        if (voice.speak(event.getGuild(), text, voices.defaultVoice()) == SpeakResult.QUEUE_FULL) {
             event.getMessage().reply("Очередь сообщений переполнена, не так быстро!")
                     .delay(Duration.ofSeconds(10))
                     .flatMap(Message::delete)

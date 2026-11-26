@@ -11,28 +11,32 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
-/** Текст → PCM: режет на куски, синтезирует и декодирует в пуле потоков, кладёт результат в слоты очереди. */
+/**
+ * Текст → PCM: режет на куски, синтезирует голосом автора и декодирует в пуле потоков, кладёт результат
+ * в слоты очереди. Движок выбирается по голосу через {@link VoiceRegistry}.
+ */
 public class TtsSynthesizer {
 
     private static final Logger log = LoggerFactory.getLogger(TtsSynthesizer.class);
-    private final TtsEngine engine;
+    private final VoiceRegistry voices;
     private final AudioDecoder decoder;
     private final Executor executor; // ограниченный пул: его размер и есть лимит одновременных синтезов
     private final int maxChunksPerMessage;
 
-    public TtsSynthesizer(TtsEngine engine, AudioDecoder decoder, Executor executor, int maxChunksPerMessage) {
-        this.engine = engine;
+    public TtsSynthesizer(VoiceRegistry voices, AudioDecoder decoder, Executor executor, int maxChunksPerMessage) {
+        this.voices = voices;
         this.decoder = decoder;
         this.executor = executor;
         this.maxChunksPerMessage = maxChunksPerMessage;
     }
 
-    /** Режет текст на куски, которые движок примет за один запрос; не больше maxChunksPerMessage кусков. */
-    public List<String> split(String text) {
-        List<String> chunks = splitByWords(text, engine.maxTextLength());
+    /** Режет текст на куски, которые движок голоса примет за один запрос; не больше maxChunksPerMessage кусков. */
+    public List<String> split(String text, Voice voice) {
+        int maxLength = voices.engine(voice).maxTextLength();
+        List<String> chunks = splitByWords(text, maxLength);
         if (log.isDebugEnabled()) {
             log.debug("text of {} chars split into {} chunks of {} chars (limit {})", text.length(), chunks.size(),
-                    chunks.stream().map(String::length).toList(), engine.maxTextLength());
+                    chunks.stream().map(String::length).toList(), maxLength);
         }
         if (chunks.size() <= maxChunksPerMessage) {
             return chunks;
@@ -45,11 +49,12 @@ public class TtsSynthesizer {
     }
 
     /**
-     * Синтезирует кусок в пуле и кладёт PCM в слот; ошибку синтеза — тоже в слот.
+     * Синтезирует кусок голосом voice в пуле и кладёт PCM в слот; ошибку синтеза — тоже в слот.
      *
      * @param label подпись для логов: гильдия, id слота и номер куска
      */
-    public void synthesizeInto(CompletableFuture<ByteBuffer> slot, String text, String label) {
+    public void synthesizeInto(CompletableFuture<ByteBuffer> slot, String text, Voice voice, String label) {
+        TtsEngine engine = voices.engine(voice);
         long submitted = System.nanoTime();
         executor.execute(() -> {
             long started = System.nanoTime();
@@ -59,10 +64,10 @@ public class TtsSynthesizer {
                         slot.isCancelled() ? "cancelled" : "completed (timed out)", millisSince(submitted));
                 return;
             }
-            log.debug("[{}] synthesizing {} chars after {} ms in the pool queue: «{}»",
-                    label, text.length(), millisSince(submitted), preview(text));
+            log.debug("[{}] synthesizing {} chars with {} after {} ms in the pool queue: «{}»",
+                    label, text.length(), voice, millisSince(submitted), preview(text));
             try {
-                byte[] encoded = engine.synthesize(text);
+                byte[] encoded = engine.synthesize(text, voice.id());
                 long synthesized = System.nanoTime();
                 byte[] pcm = decoder.toPcm(encoded);
                 boolean accepted = slot.complete(ByteBuffer.wrap(pcm));

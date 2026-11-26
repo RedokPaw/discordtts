@@ -4,6 +4,7 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.managers.AudioManager;
 import org.redok.tts.TtsSynthesizer;
+import org.redok.tts.Voice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,19 +71,19 @@ public class VoiceService {
         }
     }
 
-    /** Ставит текст в очередь гильдии. Места резервируются сразу, в порядке прихода сообщений. */
-    public SpeakResult speak(Guild guild, String text) {
-        SpeakResult result = enqueue(guild, text);
-        log.debug("[{}] speak({} chars) -> {}", guild.getId(), text.length(), result);
+    /** Ставит текст в очередь гильдии голосом voice. Места резервируются сразу, в порядке прихода сообщений. */
+    public SpeakResult speak(Guild guild, String text, Voice voice) {
+        SpeakResult result = enqueue(guild, text, voice);
+        log.debug("[{}] speak({} chars, {}) -> {}", guild.getId(), text.length(), voice, result);
         return result;
     }
 
-    private SpeakResult enqueue(Guild guild, String text) {
+    private SpeakResult enqueue(Guild guild, String text, Voice voice) {
         GuildVoiceSession session = sessions.get(guild.getId());
         if (session == null) {
             return SpeakResult.NOT_CONNECTED;
         }
-        List<String> chunks = synthesizer.split(text);
+        List<String> chunks = synthesizer.split(text, voice);
         if (chunks.isEmpty()) {
             return SpeakResult.NOTHING_TO_SAY; // картинка, стикер или эмбед без текста
         }
@@ -94,7 +95,7 @@ public class VoiceService {
             CompletableFuture<ByteBuffer> slot = slots.get(i);
             // подпись для логов: гильдия, слот и номер куска — по ней кусок видно до самого воспроизведения
             String label = "%s/%s %d/%d".formatted(guild.getId(), GuildVoiceSession.slotId(slot), i + 1, chunks.size());
-            synthesizer.synthesizeInto(slot, chunks.get(i), label);
+            synthesizer.synthesizeInto(slot, chunks.get(i), voice, label);
         }
         return SpeakResult.QUEUED;
     }

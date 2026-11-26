@@ -41,9 +41,9 @@ class TtsChatListenerTest {
     @BeforeEach
     void joinTheVoiceChannel() {
         // очередь на одно место, синтез прямо в вызывающем потоке
-        VoiceService voice = new VoiceService(new TtsSynthesizer(engine, encoded -> encoded, Runnable::run, 1), 1);
+        VoiceService voice = new VoiceService(new TtsSynthesizer(engine.registry(), encoded -> encoded, Runnable::run, 1), 1);
         voice.join(guild, voiceChannel);
-        listener = new TtsChatListener(voice);
+        listener = new TtsChatListener(voice, engine.registry());
     }
 
     @Test

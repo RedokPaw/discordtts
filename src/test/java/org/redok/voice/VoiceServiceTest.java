@@ -33,7 +33,7 @@ class VoiceServiceTest {
 
     @Test
     void speakWithoutJoinIsNotConnected() {
-        assertEquals(SpeakResult.NOT_CONNECTED, voice(10, 3).speak(guild("g"), "привет"));
+        assertEquals(SpeakResult.NOT_CONNECTED, voice(10, 3).speak(guild("g"), "привет", FakeTts.VOICE));
     }
 
     @Test
@@ -50,7 +50,7 @@ class VoiceServiceTest {
         Guild guild = guild("g");
         voice.join(guild, channel);
 
-        assertEquals(SpeakResult.QUEUED, voice.speak(guild, "раз два три четыре"));
+        assertEquals(SpeakResult.QUEUED, voice.speak(guild, "раз два три четыре", FakeTts.VOICE));
 
         assertEquals(List.of("раз два", "три четыре"), engine.texts());
         assertEquals(List.of("раз два", "три четыре"), playedTexts(session()));
@@ -62,7 +62,7 @@ class VoiceServiceTest {
         Guild guild = guild("g");
         voice.join(guild, channel);
 
-        voice.speak(guild, "раз два три четыре пять шесть");
+        voice.speak(guild, "раз два три четыре пять шесть", FakeTts.VOICE);
 
         assertEquals(List.of("раз два", "три четыре"), engine.texts());
     }
@@ -73,7 +73,7 @@ class VoiceServiceTest {
         Guild guild = guild("g");
         voice.join(guild, channel);
 
-        assertEquals(SpeakResult.NOTHING_TO_SAY, voice.speak(guild, "  \n "));
+        assertEquals(SpeakResult.NOTHING_TO_SAY, voice.speak(guild, "  \n ", FakeTts.VOICE));
         assertTrue(engine.texts().isEmpty());
     }
 
@@ -83,9 +83,9 @@ class VoiceServiceTest {
         Guild guild = guild("g");
         voice.join(guild, channel);
 
-        assertEquals(SpeakResult.QUEUED, voice.speak(guild, "раз два"));                           // 1 кусок
-        assertEquals(SpeakResult.QUEUE_FULL, voice.speak(guild, "раз два три четыре пять шесть")); // 3 куска, мест 2
-        assertEquals(SpeakResult.QUEUED, voice.speak(guild, "три четыре"));                        // 1 кусок
+        assertEquals(SpeakResult.QUEUED, voice.speak(guild, "раз два", FakeTts.VOICE));                           // 1 кусок
+        assertEquals(SpeakResult.QUEUE_FULL, voice.speak(guild, "раз два три четыре пять шесть", FakeTts.VOICE)); // 3 куска, мест 2
+        assertEquals(SpeakResult.QUEUED, voice.speak(guild, "три четыре", FakeTts.VOICE));                        // 1 кусок
 
         assertEquals(List.of("раз два", "три четыре"), engine.texts(), "отклонённое сообщение не синтезируется");
     }
@@ -100,7 +100,7 @@ class VoiceServiceTest {
 
         assertNull(sendingHandlers.getLast(), "JDA не должна держать старую сессию с очередью");
         assertTrue(stubs.called("AudioManager.closeAudioConnection"));
-        assertEquals(SpeakResult.NOT_CONNECTED, voice.speak(guild, "привет"));
+        assertEquals(SpeakResult.NOT_CONNECTED, voice.speak(guild, "привет", FakeTts.VOICE));
     }
 
     @Test
@@ -108,13 +108,13 @@ class VoiceServiceTest {
         VoiceService voice = voice(10, 3);
         Guild guild = guild("g");
         voice.join(guild, channel);
-        voice.speak(guild, "привет");
+        voice.speak(guild, "привет", FakeTts.VOICE);
 
         voice.onDisconnected(guild);
 
         assertFalse(session().canProvide(), "ожидающая речь выброшена");
         assertFalse(stubs.called("closeAudioConnection"), "соединением распоряжается JDA");
-        assertEquals(SpeakResult.QUEUED, voice.speak(guild, "привет"), "сессия осталась");
+        assertEquals(SpeakResult.QUEUED, voice.speak(guild, "привет", FakeTts.VOICE), "сессия осталась");
     }
 
     @Test
@@ -123,7 +123,7 @@ class VoiceServiceTest {
         Guild guild = guild("g");
         voice.join(guild, channel);
         GuildVoiceSession previous = session();
-        voice.speak(guild, "привет");
+        voice.speak(guild, "привет", FakeTts.VOICE);
 
         voice.join(guild, channel);
 
@@ -145,7 +145,7 @@ class VoiceServiceTest {
 
     private VoiceService voice(int capacity, int maxChunks) {
         // Синтез прямо в вызывающем потоке, «декодер» отдаёт байты как есть: тест детерминирован
-        return new VoiceService(new TtsSynthesizer(engine, encoded -> encoded, Runnable::run, maxChunks), capacity);
+        return new VoiceService(new TtsSynthesizer(engine.registry(), encoded -> encoded, Runnable::run, maxChunks), capacity);
     }
 
     private Guild guild(String id) {

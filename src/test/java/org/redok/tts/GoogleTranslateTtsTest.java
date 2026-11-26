@@ -13,6 +13,7 @@ import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,7 +44,7 @@ class GoogleTranslateTtsTest {
         byte[] mp3 = {1, 2, 3};
         GoogleTranslateTts tts = engine(200, mp3, Duration.ZERO, Duration.ofSeconds(5));
 
-        assertArrayEquals(mp3, tts.synthesize("привет, мир & co"));
+        assertArrayEquals(mp3, tts.synthesize("привет, мир & co", "ru"));
 
         Map<String, String> query = parse(rawQuery.get());
         assertEquals("ru", query.get("tl"));
@@ -55,7 +56,7 @@ class GoogleTranslateTtsTest {
     void failsOnAnErrorStatus() throws Exception {
         GoogleTranslateTts tts = engine(400, "<html>".getBytes(StandardCharsets.UTF_8), Duration.ZERO, Duration.ofSeconds(5));
 
-        IOException e = assertThrows(IOException.class, () -> tts.synthesize("а".repeat(201)));
+        IOException e = assertThrows(IOException.class, () -> tts.synthesize("а".repeat(201), "ru"));
         assertTrue(e.getMessage().contains("HTTP 400"), e.getMessage());
     }
 
@@ -64,13 +65,29 @@ class GoogleTranslateTtsTest {
         GoogleTranslateTts tts = engine(200, new byte[]{1}, Duration.ofSeconds(3), Duration.ofMillis(300));
         long start = System.nanoTime();
 
-        assertThrows(HttpTimeoutException.class, () -> tts.synthesize("привет"));
+        assertThrows(HttpTimeoutException.class, () -> tts.synthesize("привет", "ru"));
         assertTrue(Duration.ofNanos(System.nanoTime() - start).toMillis() < 2000, "ждали дольше таймаута");
     }
 
     @Test
+    void theVoiceIsTheLanguage() throws Exception {
+        GoogleTranslateTts tts = engine(200, new byte[]{1}, Duration.ZERO, Duration.ofSeconds(5));
+
+        tts.synthesize("hello", "en");
+
+        assertEquals("en", parse(rawQuery.get()).get("tl"));
+        assertEquals(List.of(new VoiceInfo(new Voice("google", "ru"), "Русский"),
+                new VoiceInfo(new Voice("google", "en"), "Английский")), tts.voices());
+    }
+
+    @Test
+    void repeatedLanguagesBecomeOneVoice() {
+        assertEquals(1, new GoogleTranslateTts(List.of("ru", "ru")).voices().size());
+    }
+
+    @Test
     void acceptsAtMost200Characters() {
-        assertEquals(200, new GoogleTranslateTts("ru").maxTextLength());
+        assertEquals(200, new GoogleTranslateTts(List.of("ru")).maxTextLength());
     }
 
     private GoogleTranslateTts engine(int status, byte[] body, Duration delay, Duration timeout) throws IOException {
@@ -90,7 +107,7 @@ class GoogleTranslateTtsTest {
         server.setExecutor(serverThreads);
         server.start();
         String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/translate_tts";
-        return new GoogleTranslateTts(HttpClient.newHttpClient(), endpoint, "ru", timeout);
+        return new GoogleTranslateTts(HttpClient.newHttpClient(), endpoint, List.of("ru", "en"), timeout);
     }
 
     private static Map<String, String> parse(String rawQuery) {
