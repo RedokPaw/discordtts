@@ -85,6 +85,22 @@ class TtsChatListenerTest {
     }
 
     @Test
+    void skipsMessagesStartingWithAnExclamationMark() {
+        receive(memberIn(voiceChannel), "42", "!не читай это");
+        receive(memberIn(voiceChannel), "42", "  !и это тоже");
+
+        assertTrue(engine.texts().isEmpty());
+        assertFalse(stubs.called("Message.reply"), "пропуск — не переполненная очередь");
+    }
+
+    @Test
+    void readsAnExclamationMarkInsideTheMessage() {
+        receive(memberIn(voiceChannel), "42", "привет!");
+
+        assertEquals(List.of("привет!"), engine.texts());
+    }
+
+    @Test
     void staysSilentOnAMessageWithoutText() {
         receive(memberIn(voiceChannel), "42", "");
 

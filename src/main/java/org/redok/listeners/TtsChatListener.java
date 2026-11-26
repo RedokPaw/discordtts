@@ -16,9 +16,13 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Читает вслух текстовый чат голосового канала, в котором сидят и автор, и бот. */
+/**
+ * Читает вслух текстовый чат голосового канала, в котором сидят и автор, и бот.
+ * Сообщения, начинающиеся с {@value #SKIP_PREFIX}, не читаются: так можно написать в чат молча.
+ */
 public class TtsChatListener extends ListenerAdapter {
 
+    static final String SKIP_PREFIX = "!";
     private static final Logger log = LoggerFactory.getLogger(TtsChatListener.class);
     private final VoiceService voice;
 
@@ -51,6 +55,10 @@ public class TtsChatListener extends ListenerAdapter {
         }
 
         String content = event.getMessage().getContentDisplay();
+        if (content.stripLeading().startsWith(SKIP_PREFIX)) {
+            log.debug("message {} ignored: starts with '{}'", event.getMessageId(), SKIP_PREFIX);
+            return;
+        }
         String text = UrlReplacer.replaceUrlsWithDomains(content);
         log.debug("message {} accepted: {} chars ({} after replacing URLs)", event.getMessageId(), content.length(),
                 text.length());
