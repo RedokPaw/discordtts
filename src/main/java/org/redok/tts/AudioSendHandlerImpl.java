@@ -1,79 +1,80 @@
 package org.redok.tts;
 
 import net.dv8tion.jda.api.audio.AudioSendHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 
 public class AudioSendHandlerImpl implements AudioSendHandler {
 
     private static final int QUEUE_CAPACITY = 10;
-    private static final int FRAME_SIZE = 3840;
-    private final BlockingQueue<ByteBuffer> ttsQueue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
-    private ByteBuffer ttsBuffer;
-    private ByteBuffer chunk = ByteBuffer.allocate(FRAME_SIZE);
-    private boolean hasChunk = false;
+    private static final int FRAME_SIZE = 3840; // 20 мс PCM: 48000 Гц × 2 канала × 2 байта × 0.02 с
+    private static final long SLOT_TIMEOUT_SECONDS = 30;
 
-    private final Logger log = LoggerFactory.getLogger(AudioSendHandlerImpl.class);
+    // Слоты в порядке прихода сообщений. Слот — обещание PCM-буфера, который, возможно, ещё синтезируется.
+    private final BlockingQueue<CompletableFuture<ByteBuffer>> ttsQueue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
+    private final ByteBuffer frame = ByteBuffer.allocate(FRAME_SIZE);
+    private ByteBuffer ttsBuffer; // играющий сейчас буфер; трогает только аудиопоток JDA
 
-    public boolean queueTtsStream(InputStream inputStream) {
-        byte[] payload;
-        try (inputStream) {
-            payload = inputStream.readAllBytes();
-        } catch (IOException e) {
-            log.error("something bad happened while reading tts audio: {}", e.getMessage());
-            throw new RuntimeException(e);
+    /**
+     * Вызывается из потока событий JDA в момент прихода сообщения. Резервирует места под все его куски:
+     * либо все сразу, либо ни одного, чтобы сообщение не оборвалось на середине из-за заполненной очереди.
+     *
+     * @return пустые слоты в порядке воспроизведения или пустой список, если мест не хватает
+     */
+    public synchronized List<CompletableFuture<ByteBuffer>> reserveSlots(int count) {
+        if (ttsQueue.remainingCapacity() < count) {
+            return List.of();
         }
-        int remainder = payload.length % FRAME_SIZE;
-        if (remainder != 0) {
-            payload = Arrays.copyOf(payload, payload.length + (FRAME_SIZE - remainder));
+        List<CompletableFuture<ByteBuffer>> slots = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            // Таймаут гарантирует, что слот разрешится: зависший синтез не заблокирует очередь навсегда.
+            CompletableFuture<ByteBuffer> slot = new CompletableFuture<ByteBuffer>()
+                    .orTimeout(SLOT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            ttsQueue.add(slot); // место есть: добавляем только здесь (synchronized), аудиопоток лишь освобождает
+            slots.add(slot);
         }
-        return ttsQueue.offer(ByteBuffer.wrap(payload));
+        return slots;
     }
 
-    public boolean isQueueFull() {
-        return ttsQueue.size() >= QUEUE_CAPACITY;
+    /** При выходе из канала: отменяем все ожидающие слоты, их буферы сразу становятся мусором. */
+    public void clear() {
+        CompletableFuture<ByteBuffer> slot;
+        while ((slot = ttsQueue.poll()) != null) {
+            slot.cancel(false);
+        }
     }
 
     @Override
     public boolean canProvide() {
-        if (hasChunk) {
-            return true;
-        }
-        if (ttsBuffer == null) {
-            ttsBuffer = ttsQueue.poll();
-            if (ttsBuffer == null) {
-                return false;
+        while (ttsBuffer == null || !ttsBuffer.hasRemaining()) {
+            ttsBuffer = null; // доигранный буфер отпускаем сразу, не дожидаясь следующего сообщения
+            CompletableFuture<ByteBuffer> head = ttsQueue.peek();
+            if (head == null || !head.isDone()) {
+                return false; // голова ещё готовится — ждём, даже если следующие слоты уже готовы
             }
+            ttsQueue.poll();
+            // Ошибка, таймаут или отмена — пропускаем слот и сразу смотрим следующий.
+            ttsBuffer = head.isCompletedExceptionally() ? null : head.join();
         }
-
-        int bytesLeft = Math.min(ttsBuffer.remaining(), FRAME_SIZE);
-        if (bytesLeft == 0) {
-            ttsBuffer = null;
-            return false;
-        }
-
-        chunk.clear();
-        ttsBuffer.limit(ttsBuffer.position() + bytesLeft);
-        chunk.put(ttsBuffer);
-        ttsBuffer.limit(ttsBuffer.capacity());
-
-        chunk.flip();
-        hasChunk = true;
         return true;
     }
 
     @Override
     public ByteBuffer provide20MsAudio() {
-        hasChunk = false;
-        return chunk;
+        int n = Math.min(ttsBuffer.remaining(), FRAME_SIZE);
+        frame.clear();
+        frame.put(0, ttsBuffer, ttsBuffer.position(), n); // абсолютный put (Java 16+), позиции не двигает
+        ttsBuffer.position(ttsBuffer.position() + n);
+        Arrays.fill(frame.array(), n, FRAME_SIZE, (byte) 0); // хвост последнего кадра — тишина
+        return frame;
     }
 
     @Override

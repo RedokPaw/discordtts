@@ -36,8 +36,9 @@ public class BotController {
 
     public void leaveVoiceChannel(@NotNull Guild guild) {
         log.info("leaving voice channel in guild: {}", guild.getId());
-        ttsMessageHandler.unregisterGuild(guild.getId());
         AudioManager audioManager = guild.getAudioManager();
+        audioManager.setSendingHandler(null); // иначе JDA держит старый хендлер с очередью до следующего /join
         audioManager.closeAudioConnection();
+        ttsMessageHandler.unregisterGuild(guild.getId()); // отменяет слоты, память освобождается сразу
     }
 }
