@@ -1,5 +1,6 @@
 package org.redok.listeners;
 
+import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.InteractionHook;
@@ -13,7 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Передаёт слэш-команду обработчику с тем же именем. */
+/** Передаёт слэш-команду и запрос автодополнения обработчику с тем же именем. */
 public class CommandListener extends ListenerAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(CommandListener.class);
@@ -36,6 +37,16 @@ public class CommandListener extends ListenerAdapter {
                     .delay(Duration.ofSeconds(10))
                     .flatMap(InteractionHook::deleteOriginal)
                     .queue();
+        }
+    }
+
+    @Override
+    public void onCommandAutoCompleteInteraction(@NotNull CommandAutoCompleteInteractionEvent event) {
+        SlashCommand slashCommand = commands.get(event.getName());
+        if (slashCommand != null) {
+            slashCommand.onAutocomplete(event);
+        } else {
+            event.replyChoices(List.of()).queue();
         }
     }
 }

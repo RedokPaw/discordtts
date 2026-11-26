@@ -10,6 +10,7 @@ import org.redok.audio.FfmpegDecoder;
 import org.redok.commands.JoinChannelCommand;
 import org.redok.commands.LeaveChannelCommand;
 import org.redok.commands.SlashCommand;
+import org.redok.commands.VoiceCommand;
 import org.redok.configuration.BotConfig;
 import org.redok.listeners.CommandListener;
 import org.redok.listeners.TtsChatListener;
@@ -51,7 +52,8 @@ public class Main {
         VoiceService voice = new VoiceService(synthesizer, config.ttsQueueCapacity());
         List<SlashCommand> commands = List.of(
                 new JoinChannelCommand(voice),
-                new LeaveChannelCommand(voice));
+                new LeaveChannelCommand(voice),
+                new VoiceCommand(preferences, voices, voice));
 
         log.info("Starting bot");
         AudioModuleConfig audioModuleConfig = new AudioModuleConfig()
