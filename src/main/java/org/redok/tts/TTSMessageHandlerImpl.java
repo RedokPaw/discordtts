@@ -26,23 +26,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 //TODO: Отделить гуглттс, сделать аудиопровайдера кастомайзбл, конвертирование тоже увести в другой класс
-//и еще вынести кол-во threads в env
 public class TTSMessageHandlerImpl implements TTSMessageHandler {
 
-    private static final int MAX_PROCESS_THREADS = 5;
     private static final int MAX_TTS_LENGTH = 200;       // больше Google TTS не принимает: на 201 символ отвечает 400
-    private static final int MAX_CHUNKS_PER_MESSAGE = 3; // ~600 символов, около минуты речи; остальное отбрасывается
     private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(15);
     private static final Duration FFMPEG_TIMEOUT = Duration.ofSeconds(10);
     private static final String TTS_URL =
             "https://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&client=tw-ob&tl=%s&q=%s";
 
-    private final Logger log = LoggerFactory.getLogger(TTSMessageHandlerImpl.class);
-    private final String language = "ru";
+    private static final Logger log = LoggerFactory.getLogger(TTSMessageHandlerImpl.class);
+    private final String language;
+    private final int queueCapacity;
+    private final int maxChunksPerMessage; // сколько кусков по MAX_TTS_LENGTH читать из одного сообщения
     private final Map<String, AudioSendHandlerImpl> handlerPerGuild = new HashMap<>();
-    // Пул сам ограничивает параллельность: не больше MAX_PROCESS_THREADS синтезов (HTTP + ffmpeg) на весь бот.
-    private final ExecutorService synthPool =
-            Executors.newFixedThreadPool(MAX_PROCESS_THREADS, Thread.ofPlatform().name("tts-", 1).factory());
+    // Пул сам ограничивает параллельность: не больше threads синтезов (HTTP + ffmpeg) на весь бот.
+    private final ExecutorService synthPool;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .build();
@@ -57,13 +55,20 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
             "pipe:1"
     ).redirectError(ProcessBuilder.Redirect.DISCARD); // stderr никто не читает — не даём ему забить пайп
 
+    public TTSMessageHandlerImpl(String language, int threads, int queueCapacity, int maxChunksPerMessage) {
+        this.language = language;
+        this.queueCapacity = queueCapacity;
+        this.maxChunksPerMessage = maxChunksPerMessage;
+        this.synthPool = Executors.newFixedThreadPool(threads, Thread.ofPlatform().name("tts-", 1).factory());
+    }
+
     @Override
     public boolean handleMessageAndSpeak(String text, String guildId) {
         AudioSendHandlerImpl handler = handlerPerGuild.get(guildId);
         if (handler == null) {
             return false;
         }
-        List<String> chunks = splitForTts(text);
+        List<String> chunks = splitForTts(text, maxChunksPerMessage);
         if (chunks.isEmpty()) {
             return true; // произносить нечего — это не переполнение очереди
         }
@@ -82,7 +87,7 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
 
     @Override
     public AudioSendHandler registerGuild(String guildId) {
-        AudioSendHandlerImpl audioSendHandler = new AudioSendHandlerImpl();
+        AudioSendHandlerImpl audioSendHandler = new AudioSendHandlerImpl(queueCapacity);
         AudioSendHandlerImpl previous = handlerPerGuild.put(guildId, audioSendHandler);
         if (previous != null) {
             previous.clear(); // повторный /join: старая очередь больше никому не нужна
@@ -100,9 +105,9 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
 
     /**
      * Режет текст по словам на куски не длиннее MAX_TTS_LENGTH; слово длиннее лимита режется жёстко.
-     * Возвращает не больше MAX_CHUNKS_PER_MESSAGE кусков. Пакетный доступ — для проверки без Discord.
+     * Возвращает не больше maxChunks кусков. Пакетный доступ — для проверки без Discord.
      */
-    static List<String> splitForTts(String text) {
+    static List<String> splitForTts(String text, int maxChunks) {
         List<String> chunks = new ArrayList<>();
         StringBuilder chunk = new StringBuilder();
         for (String word : text.strip().split("\\s+")) {
@@ -120,7 +125,7 @@ public class TTSMessageHandlerImpl implements TTSMessageHandler {
             chunk.append(word);
         }
         addChunk(chunks, chunk);
-        return chunks.size() > MAX_CHUNKS_PER_MESSAGE ? List.copyOf(chunks.subList(0, MAX_CHUNKS_PER_MESSAGE)) : chunks;
+        return chunks.size() > maxChunks ? List.copyOf(chunks.subList(0, maxChunks)) : chunks;
     }
 
     private static void addChunk(List<String> chunks, StringBuilder chunk) {

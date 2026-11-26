@@ -9,7 +9,6 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 import org.redok.bot.BotController;
-import org.redok.bot.BotFactory;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -19,7 +18,11 @@ public class LeaveChannelCommand implements SlashCommand {
     // Только серверы: по умолчанию команда доступна и в ЛС с ботом, где getMember() == null
     private final static SlashCommandData commandData = Commands.slash("leave", "Leave user channel")
             .setContexts(InteractionContextType.GUILD);
-    private final BotController botController = BotFactory.getBotRunner().getBotController();
+    private final BotController botController;
+
+    public LeaveChannelCommand(BotController botController) {
+        this.botController = botController;
+    }
 
     @Override
     public SlashCommandData getSlashCommandData() {

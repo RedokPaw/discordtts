@@ -12,15 +12,14 @@ import java.util.List;
 
 public class BotCommandHandler {
 
-    private final Logger log = LoggerFactory.getLogger(BotCommandHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(BotCommandHandler.class);
     private final HashMap<String, SlashCommand> commands = new HashMap<>();
 
-    public BotCommandHandler() {
+    public BotCommandHandler(List<SlashCommand> commandList) {
         log.debug("Registering commands");
-        SlashCommand joinCommand = new JoinChannelCommand();
-        commands.put(joinCommand.getSlashCommandData().getName(), joinCommand);
-        SlashCommand leaveCommand = new LeaveChannelCommand();
-        commands.put(leaveCommand.getSlashCommandData().getName(), leaveCommand);
+        for (SlashCommand command : commandList) {
+            commands.put(command.getSlashCommandData().getName(), command);
+        }
     }
 
     public void doCommand(SlashCommandInteractionEvent event) {

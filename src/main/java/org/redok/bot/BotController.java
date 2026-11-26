@@ -6,22 +6,16 @@ import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.managers.AudioManager;
 import org.jetbrains.annotations.NotNull;
 import org.redok.tts.TTSMessageHandler;
-import org.redok.tts.TTSMessageHandlerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class BotController {
 
-    private final Logger log = LoggerFactory.getLogger(BotController.class);
-    private final BotRunner botRunner;
-    private final TTSMessageHandler ttsMessageHandler = TTSMessageHandlerFactory.getMessageHandler();
+    private static final Logger log = LoggerFactory.getLogger(BotController.class);
+    private final TTSMessageHandler ttsMessageHandler;
 
-    private BotController(BotRunner botRunner) {
-        this.botRunner = botRunner;
-    }
-
-    public static BotController create(BotRunner botRunner) {
-        return new BotController(botRunner);
+    public BotController(TTSMessageHandler ttsMessageHandler) {
+        this.ttsMessageHandler = ttsMessageHandler;
     }
 
     public void joinVoiceChannel(@NotNull Guild guild, @NotNull GuildVoiceState guildVoiceState) {

@@ -10,7 +10,6 @@ import net.dv8tion.jda.api.interactions.InteractionContextType;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 import org.redok.bot.BotController;
-import org.redok.bot.BotFactory;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -20,7 +19,11 @@ public class JoinChannelCommand implements SlashCommand {
     // Только серверы: по умолчанию команда доступна и в ЛС с ботом, где getMember() == null
     private final static SlashCommandData commandData = Commands.slash("join", "Join user voice channel")
             .setContexts(InteractionContextType.GUILD);
-    private final BotController botController = BotFactory.getBotRunner().getBotController();
+    private final BotController botController;
+
+    public JoinChannelCommand(BotController botController) {
+        this.botController = botController;
+    }
 
     @Override
 

@@ -14,14 +14,17 @@ import java.util.concurrent.TimeUnit;
 
 public class AudioSendHandlerImpl implements AudioSendHandler {
 
-    private static final int QUEUE_CAPACITY = 10;
     private static final int FRAME_SIZE = 3840; // 20 мс PCM: 48000 Гц × 2 канала × 2 байта × 0.02 с
     private static final long SLOT_TIMEOUT_SECONDS = 30;
 
     // Слоты в порядке прихода сообщений. Слот — обещание PCM-буфера, который, возможно, ещё синтезируется.
-    private final BlockingQueue<CompletableFuture<ByteBuffer>> ttsQueue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
+    private final BlockingQueue<CompletableFuture<ByteBuffer>> ttsQueue;
     private final ByteBuffer frame = ByteBuffer.allocate(FRAME_SIZE);
     private ByteBuffer ttsBuffer; // играющий сейчас буфер; трогает только аудиопоток JDA
+
+    public AudioSendHandlerImpl(int capacity) {
+        this.ttsQueue = new LinkedBlockingQueue<>(capacity);
+    }
 
     /**
      * Вызывается из потока событий JDA в момент прихода сообщения. Резервирует места под все его куски:

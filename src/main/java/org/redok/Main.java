@@ -1,13 +1,57 @@
 package org.redok;
 
-import org.redok.bot.BotFactory;
-import org.redok.bot.BotRunner;
+import club.minnced.discord.jdave.interop.JDaveSessionFactory;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.audio.AudioModuleConfig;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
+import org.redok.bot.BotController;
+import org.redok.commands.BotCommandHandler;
+import org.redok.commands.JoinChannelCommand;
+import org.redok.commands.LeaveChannelCommand;
+import org.redok.commands.SlashCommand;
+import org.redok.configuration.BotConfig;
+import org.redok.listeners.EventControllerListener;
+import org.redok.tts.TTSMessageHandler;
+import org.redok.tts.TTSMessageHandlerImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
+/** Точка сборки: все объекты создаются здесь и получают зависимости через конструктор. */
 public class Main {
+
+    private static final Logger log = LoggerFactory.getLogger(Main.class);
+
     public static void main(String[] args) throws IOException {
-        BotRunner botRunner = BotFactory.getBotRunner();
-        botRunner.run();
+        BotConfig config = BotConfig.load();
+
+        TTSMessageHandler ttsMessageHandler = new TTSMessageHandlerImpl(
+                config.ttsLanguage(), config.ttsThreads(), config.ttsQueueCapacity(), config.ttsMaxChunks());
+        BotController botController = new BotController(ttsMessageHandler);
+        List<SlashCommand> commands = List.of(
+                new JoinChannelCommand(botController),
+                new LeaveChannelCommand(botController));
+
+        log.info("Starting bot");
+        AudioModuleConfig audioModuleConfig = new AudioModuleConfig()
+                //.withAudioSendFactory(new NativeAudioSendFactory())
+                .withDaveSessionFactory(new JDaveSessionFactory());
+        JDA jda = JDABuilder
+                .createDefault(config.token())
+                .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT)
+                .addEventListeners(new EventControllerListener(
+                        new BotCommandHandler(commands), ttsMessageHandler, botController))
+                .setAudioModuleConfig(audioModuleConfig)
+                .enableCache(CacheFlag.VOICE_STATE)
+                .build();
+        jda.updateCommands()
+                .addCommands(commands.stream().map(SlashCommand::getSlashCommandData).toList())
+                .queue();
+        log.info("Connecting to Discord");
+        HealthServer.start(config.port());
     }
 }

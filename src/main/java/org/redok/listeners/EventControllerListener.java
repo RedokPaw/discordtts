@@ -11,11 +11,8 @@ import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.redok.bot.BotController;
-import org.redok.bot.BotFactory;
 import org.redok.commands.BotCommandHandler;
-import org.redok.commands.BotCommandHandlerFactory;
 import org.redok.tts.TTSMessageHandler;
-import org.redok.tts.TTSMessageHandlerFactory;
 import org.redok.utils.UrlReplacer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,10 +23,17 @@ import java.util.Objects;
 
 public class EventControllerListener extends ListenerAdapter {
 
-    private final Logger log = LoggerFactory.getLogger(EventControllerListener.class);
-    private final BotCommandHandler botCommandHandler = BotCommandHandlerFactory.getBotCommandHandler();
-    private final TTSMessageHandler messageHandler = TTSMessageHandlerFactory.getMessageHandler();
-    private final BotController botController = BotFactory.getBotRunner().getBotController();
+    private static final Logger log = LoggerFactory.getLogger(EventControllerListener.class);
+    private final BotCommandHandler botCommandHandler;
+    private final TTSMessageHandler messageHandler;
+    private final BotController botController;
+
+    public EventControllerListener(BotCommandHandler botCommandHandler, TTSMessageHandler messageHandler,
+                                   BotController botController) {
+        this.botCommandHandler = botCommandHandler;
+        this.messageHandler = messageHandler;
+        this.botController = botController;
+    }
 
     @Override
     public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event) {
