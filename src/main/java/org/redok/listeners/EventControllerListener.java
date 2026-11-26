@@ -38,23 +38,30 @@ public class EventControllerListener extends ListenerAdapter {
 
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
-        if (event.getAuthor().isBot()) {
+        // getMember() == null для личных сообщений и вебхуков
+        Member member = event.getMember();
+        if (event.getAuthor().isBot() || member == null) {
             return;
         }
-        GuildVoiceState memberVoiceState = event.getMember().getVoiceState();
-        if (memberVoiceState == null) {
+        // При CacheFlag.VOICE_STATE getVoiceState() не бывает null, но вне войса getChannel() == null
+        GuildVoiceState memberVoiceState = member.getVoiceState();
+        AudioChannelUnion voiceChannel = memberVoiceState == null ? null : memberVoiceState.getChannel();
+        if (voiceChannel == null) {
             return;
         }
-        if (!Objects.equals(event.getMessage().getChannelId(), memberVoiceState.getChannel().getId())) {
+        if (!Objects.equals(event.getMessage().getChannelId(), voiceChannel.getId())) {
             return;
         }
-        if (memberVoiceState.getChannel().getMembers()
+        if (voiceChannel.getMembers()
                 .stream()
-                .noneMatch(member -> member.getId().equals(event.getJDA().getSelfUser().getId()))) {
+                .noneMatch(m -> m.getId().equals(event.getJDA().getSelfUser().getId()))) {
             return;
         }
 
         String text = UrlReplacer.replaceUrlsWithDomains(event.getMessage().getContentDisplay());
+        if (text.isBlank()) {
+            return; // картинка, стикер или эмбед без текста: произносить нечего, Google ответил бы 400
+        }
         boolean queued = messageHandler.handleMessageAndSpeak(text, event.getGuild().getId());
         if (!queued) {
             event.getMessage().reply("Очередь сообщений переполнена, не так быстро!")
@@ -71,10 +78,11 @@ public class EventControllerListener extends ListenerAdapter {
         if (audioChannelUnion == null) {
             return;
         }
-        List<Member> voiceChannelMembers = audioChannelUnion.asVoiceChannel().getMembers();
+        // getMembers() есть у любого AudioChannel, а asVoiceChannel() бросал IllegalStateException на Stage-каналах
+        List<Member> voiceChannelMembers = audioChannelUnion.getMembers();
         if (voiceChannelMembers.size() == 1 &&
                 voiceChannelMembers.getFirst().getId().equals(event.getJDA().getSelfUser().getId())) {
-            log.info("leaving empty voice channel: {} ", audioChannelUnion.asVoiceChannel().getId());
+            log.info("leaving empty voice channel: {} ", audioChannelUnion.getId());
             botController.leaveVoiceChannel(guild);
         }
     }

@@ -1,7 +1,9 @@
 package org.redok.commands;
 
 import net.dv8tion.jda.api.entities.GuildVoiceState;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.InteractionContextType;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
@@ -14,7 +16,9 @@ import java.util.Objects;
 
 public class LeaveChannelCommand implements SlashCommand {
 
-    private final static SlashCommandData commandData = Commands.slash("leave", "Leave user channel");
+    // Только серверы: по умолчанию команда доступна и в ЛС с ботом, где getMember() == null
+    private final static SlashCommandData commandData = Commands.slash("leave", "Leave user channel")
+            .setContexts(InteractionContextType.GUILD);
     private final BotController botController = BotFactory.getBotRunner().getBotController();
 
     @Override
@@ -25,14 +29,16 @@ public class LeaveChannelCommand implements SlashCommand {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         ReplyCallbackAction replyCallbackAction;
-        GuildVoiceState voiceState = event.getMember().getVoiceState();
-        if (event.getGuild() == null) {
-            replyCallbackAction = event.reply("Гильдия не найдена, комманда введена на сервере?");
-        } else if (event.getMember().getVoiceState() == null) {
+        Member member = event.getMember();
+        // При CacheFlag.VOICE_STATE getVoiceState() не бывает null, но вне войса getChannel() == null
+        GuildVoiceState voiceState = member == null ? null : member.getVoiceState();
+        if (event.getGuild() == null || member == null) {
+            replyCallbackAction = event.reply("Гильдия не найдена, команда введена на сервере?");
+        } else if (voiceState == null || !voiceState.inAudioChannel()) {
             replyCallbackAction = event.reply("Вы не в голосовом канале");
         } else if (voiceState.getChannel().getMembers()
                 .stream()
-                .anyMatch(member -> Objects.equals(event.getJDA().getSelfUser().getId(), member.getId()))) {
+                .anyMatch(m -> Objects.equals(event.getJDA().getSelfUser().getId(), m.getId()))) {
             botController.leaveVoiceChannel(event.getGuild());
             replyCallbackAction = event.reply("Left the voice channel");
         } else {

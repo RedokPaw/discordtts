@@ -25,8 +25,9 @@ public class BotController {
     }
 
     public void joinVoiceChannel(@NotNull Guild guild, @NotNull GuildVoiceState guildVoiceState) {
-        log.info("joining voice channel with id: {},  guild: {}", guildVoiceState.getChannel().asVoiceChannel().getId(),
-                guildVoiceState.getChannel().getName());
+        // asVoiceChannel() бросал IllegalStateException на Stage-каналах, а id и имя есть у любого канала
+        log.info("joining voice channel {} ({}) in guild {}", guildVoiceState.getChannel().getId(),
+                guildVoiceState.getChannel().getName(), guild.getId());
         AudioSendHandler audioSendHandler = ttsMessageHandler.registerGuild(guild.getId());
         AudioManager audioManager = guild.getAudioManager();
         audioManager.setSendingHandler(audioSendHandler);
