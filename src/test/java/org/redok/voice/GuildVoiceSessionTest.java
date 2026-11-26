@@ -22,7 +22,7 @@ class GuildVoiceSessionTest {
 
     @Test
     void playsSlotsInArrivalOrderEvenIfALaterSlotIsReadyFirst() {
-        GuildVoiceSession session = new GuildVoiceSession(10);
+        GuildVoiceSession session = new GuildVoiceSession("g", 10);
         CompletableFuture<ByteBuffer> first = session.reserveSlots(1).getFirst();
         CompletableFuture<ByteBuffer> second = session.reserveSlots(1).getFirst();
 
@@ -36,7 +36,7 @@ class GuildVoiceSessionTest {
 
     @Test
     void skipsAFailedHeadAndPlaysTheNextSlot() {
-        GuildVoiceSession session = new GuildVoiceSession(10);
+        GuildVoiceSession session = new GuildVoiceSession("g", 10);
         List<CompletableFuture<ByteBuffer>> slots = session.reserveSlots(2);
         slots.get(1).complete(filled(FRAME, 3));
         slots.get(0).completeExceptionally(new IOException("Google TTS answered HTTP 400"));
@@ -46,7 +46,7 @@ class GuildVoiceSessionTest {
 
     @Test
     void aStuckSlotTimesOutAndTheQueueMovesOn() throws InterruptedException {
-        GuildVoiceSession session = new GuildVoiceSession(10, Duration.ofMillis(100));
+        GuildVoiceSession session = new GuildVoiceSession("g", 10, Duration.ofMillis(100));
         List<CompletableFuture<ByteBuffer>> slots = session.reserveSlots(2);
         slots.get(1).complete(filled(FRAME, 4)); // первый слот так и не заполнится
 
@@ -60,7 +60,7 @@ class GuildVoiceSessionTest {
 
     @Test
     void reservesAllChunksOfAMessageOrNone() {
-        GuildVoiceSession session = new GuildVoiceSession(10);
+        GuildVoiceSession session = new GuildVoiceSession("g", 10);
 
         assertEquals(7, session.reserveSlots(7).size());
         assertTrue(session.reserveSlots(4).isEmpty(), "свободно 3 места: не занимается ни одно");
@@ -70,7 +70,7 @@ class GuildVoiceSessionTest {
 
     @Test
     void clearCancelsPendingSlotsAndDropsLateResults() {
-        GuildVoiceSession session = new GuildVoiceSession(10);
+        GuildVoiceSession session = new GuildVoiceSession("g", 10);
         List<CompletableFuture<ByteBuffer>> slots = session.reserveSlots(3);
 
         session.clear();
@@ -83,7 +83,7 @@ class GuildVoiceSessionTest {
 
     @Test
     void releasesThePlayedBufferImmediately() throws ReflectiveOperationException {
-        GuildVoiceSession session = new GuildVoiceSession(10);
+        GuildVoiceSession session = new GuildVoiceSession("g", 10);
         session.reserveSlots(1).getFirst().complete(filled(FRAME, 5));
 
         drain(session);

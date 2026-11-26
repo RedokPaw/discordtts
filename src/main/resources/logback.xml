@@ -15,6 +15,9 @@
         </encoder>
     </appender>
 
+    <!-- Уровень логов бота: LOG_LEVEL=DEBUG покажет путь каждого куска от нарезки до воспроизведения -->
+    <logger name="org.redok" level="${LOG_LEVEL:-INFO}" />
+
     <root level="INFO">
         <appender-ref ref="CONSOLE" />
         <appender-ref ref="FILE" />

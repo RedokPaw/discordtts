@@ -14,6 +14,7 @@ services:
       - TTS_THREADS=${TTS_THREADS:-5}
       - TTS_QUEUE_CAPACITY=${TTS_QUEUE_CAPACITY:-10}
       - TTS_MAX_CHUNKS=${TTS_MAX_CHUNKS:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8080}/health"]
       interval: 30s

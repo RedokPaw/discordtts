@@ -35,7 +35,7 @@ public class VoiceService {
     /** Подключает бота к каналу; старая очередь гильдии, если была, отбрасывается. */
     public void join(Guild guild, AudioChannel channel) {
         log.info("joining voice channel {} ({}) in guild {}", channel.getId(), channel.getName(), guild.getId());
-        GuildVoiceSession session = new GuildVoiceSession(queueCapacity);
+        GuildVoiceSession session = new GuildVoiceSession(guild.getId(), queueCapacity);
         GuildVoiceSession previous = sessions.put(guild.getId(), session);
         if (previous != null) {
             previous.clear();
@@ -72,6 +72,12 @@ public class VoiceService {
 
     /** Ставит текст в очередь гильдии. Места резервируются сразу, в порядке прихода сообщений. */
     public SpeakResult speak(Guild guild, String text) {
+        SpeakResult result = enqueue(guild, text);
+        log.debug("[{}] speak({} chars) -> {}", guild.getId(), text.length(), result);
+        return result;
+    }
+
+    private SpeakResult enqueue(Guild guild, String text) {
         GuildVoiceSession session = sessions.get(guild.getId());
         if (session == null) {
             return SpeakResult.NOT_CONNECTED;
@@ -85,7 +91,10 @@ public class VoiceService {
             return SpeakResult.QUEUE_FULL;
         }
         for (int i = 0; i < chunks.size(); i++) {
-            synthesizer.synthesizeInto(slots.get(i), chunks.get(i), guild.getId());
+            CompletableFuture<ByteBuffer> slot = slots.get(i);
+            // подпись для логов: гильдия, слот и номер куска — по ней кусок видно до самого воспроизведения
+            String label = "%s/%s %d/%d".formatted(guild.getId(), GuildVoiceSession.slotId(slot), i + 1, chunks.size());
+            synthesizer.synthesizeInto(slot, chunks.get(i), label);
         }
         return SpeakResult.QUEUED;
     }

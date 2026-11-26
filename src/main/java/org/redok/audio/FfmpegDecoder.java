@@ -1,5 +1,8 @@
 package org.redok.audio;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -11,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 /** Декодирует через внешний процесс ffmpeg: закодированный звук идёт в stdin, PCM читается из stdout. */
 public class FfmpegDecoder implements AudioDecoder {
 
+    private static final Logger log = LoggerFactory.getLogger(FfmpegDecoder.class);
     private static final List<String> FFMPEG = List.of(
             "ffmpeg",
             "-loglevel", "error",
@@ -41,8 +45,13 @@ public class FfmpegDecoder implements AudioDecoder {
         Process process = processBuilder.start();
         try {
             // Сторож: если процесс завис, через timeout он будет убит, а readAllBytes ниже получит EOF.
-            CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS)
-                    .execute(process::destroyForcibly);
+            CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS).execute(() -> {
+                if (process.isAlive()) {
+                    log.warn("{} is still running after {} ms, killing it", processBuilder.command().getFirst(),
+                            timeout.toMillis());
+                    process.destroyForcibly();
+                }
+            });
             // stdin пишем параллельно с чтением stdout, иначе обе стороны упрутся в заполненный пайп.
             Thread.ofVirtual().start(() -> {
                 try (OutputStream stdin = process.getOutputStream()) {

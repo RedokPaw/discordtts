@@ -22,6 +22,7 @@ docker compose up -d && docker compose logs -f -t
 | `TTS_THREADS` | `tts.threads` | 5 | сколько кусков синтезируется одновременно (HTTP + ffmpeg) на весь бот |
 | `TTS_QUEUE_CAPACITY` | `tts.queue-capacity` | 10 | мест в очереди гильдии; кусок до 200 символов занимает одно место |
 | `TTS_MAX_CHUNKS` | `tts.max-chunks` | 3 | сколько кусков по 200 символов читать из одного сообщения |
+| `LOG_LEVEL` | — | INFO | `DEBUG` показывает путь каждого куска: нарезка, очередь, синтез, воспроизведение |
 
 ### Tests
 `mvn test`. Тесты не ходят в сеть и не требуют ffmpeg; тесты декодера запускают `cat` и `sleep` вместо ffmpeg, поэтому выполняются только на Linux и macOS.
